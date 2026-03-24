@@ -43,7 +43,7 @@ API keys are stored in your browser's localStorage and never sent to any server 
 
 ## Project Structure
 
-```
+```text
 example/
 ├── src/
 │   ├── main.ts       # Main application entry point

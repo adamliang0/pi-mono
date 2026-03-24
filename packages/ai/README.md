@@ -317,6 +317,7 @@ for await (const event of s) {
 ```
 
 **Important notes about partial tool arguments:**
+
 - During `toolcall_delta` events, `arguments` contains the best-effort parse of partial JSON
 - Fields may be missing or incomplete - always check for existence before use
 - String values may be truncated mid-word
@@ -639,6 +640,7 @@ The library uses a registry of API implementations. Built-in APIs include:
 ### Providers and Models
 
 A **provider** offers models through a specific API. For example:
+
 - **Anthropic** models use the `anthropic-messages` API
 - **Google** models use the `google-generative-ai` API
 - **OpenAI** models use the `openai-responses` API
@@ -848,12 +850,14 @@ const geminiResponse = await complete(gemini, context);
 ### Provider Compatibility
 
 All providers can handle messages from other providers, including:
+
 - Text content
 - Tool calls and tool results (including images in tool results)
 - Thinking/reasoning blocks (transformed to tagged text for cross-provider compatibility)
 - Aborted messages with partial content
 
 This enables flexible workflows where you can:
+
 - Start with a fast model for initial responses
 - Switch to a more capable model for complex reasoning
 - Use specialized models for specific tasks
@@ -1221,6 +1225,7 @@ Add an entry to `packages/ai/CHANGELOG.md` under `## [Unreleased]`:
 
 ```markdown
 ### Added
+
 - Added support for [Provider Name] provider ([#PR](link) by [@author](link))
 ```
 

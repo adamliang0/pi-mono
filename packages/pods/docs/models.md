@@ -1,4 +1,5 @@
 ### Qwen-Coder
+
 - [ ] Qwen2.5-Coder-32B-Instruct
   - HF: Qwen/Qwen2.5-Coder-32B-Instruct
   - Hardware:
@@ -38,6 +39,7 @@
       - Notes: FP8 quantized, ~30GB model weight. Excellent for single GPU deployment.
 
 ### GPT-OSS
+
 - Notes: Requires vLLM 0.10.1+gptoss. Built-in tools via /v1/responses endpoint (browsing, Python). Function calling not yet supported. --async-scheduling recommended for higher perf (not compatible with structured output).
 - [ ] GPT-OSS-20B
   - HF: openai/gpt-oss-20b
@@ -68,6 +70,7 @@
       - Env: VLLM_USE_TRTLLM_ATTENTION=1 VLLM_USE_TRTLLM_DECODE_ATTENTION=1 VLLM_USE_TRTLLM_CONTEXT_ATTENTION=1 VLLM_USE_FLASHINFER_MXFP4_MOE=1
 
 ### GLM-4.5
+
 - Notes: Listed configs support reduced context. For full 128K context, double the GPU count. Models default to thinking mode (disable with API param).
 - [ ] GLM-4.5 (BF16)
   - HF: zai-org/GLM-4.5
@@ -103,6 +106,7 @@
   - Notes: For full 128K context: needs 4x H100 or 2x H200.
 
 ### Kimi
+
 - Notes: Requires vLLM v0.10.0rc1+. Minimum 16 GPUs for FP8 with 128k context. Reuses DeepSeekV3 architecture with model_type="kimi_k2".
 - [ ] Kimi-K2-Instruct
   - HF: moonshotai/Kimi-K2-Instruct
@@ -113,4 +117,3 @@
     - 16x H200/H20 (DP+EP mode)
       - --data-parallel-size 16 --data-parallel-size-local 8 --enable-expert-parallel --max-num-batched-tokens 8192 --max-num-seqs 256 --gpu-memory-utilization 0.85 --trust-remote-code --enable-auto-tool-choice --tool-call-parser kimi_k2
       - Notes: Data parallel + expert parallel mode for higher throughput. Requires multi-node setup with proper networking.
-

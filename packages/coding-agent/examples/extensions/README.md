@@ -175,6 +175,7 @@ export default function (pi: ExtensionAPI) {
 ## Key Patterns
 
 **Use StringEnum for string parameters** (required for Google API compatibility):
+
 ```typescript
 import { StringEnum } from "@mariozechner/pi-ai";
 
@@ -186,6 +187,7 @@ action: Type.Union([Type.Literal("list"), Type.Literal("add")])
 ```
 
 **State persistence via details:**
+
 ```typescript
 // Store state in tool result details for proper forking support
 return {

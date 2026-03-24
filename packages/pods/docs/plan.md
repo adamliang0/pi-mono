@@ -7,6 +7,7 @@ Pods are treated as ephemeral - spin up when needed, tear down when done. To avo
 ## Usage
 
 ### Pods
+
 ```bash
 pi pods setup dc1 "ssh root@1.2.3.4" --mount "mount -t nfs..."  # Setup pod (requires HF_TOKEN, PI_API_KEY env vars)
 pi pods                              # List all pods (* = active)
@@ -15,6 +16,7 @@ pi pods remove dc1                   # Remove pod
 ```
 
 ### Models
+
 ```bash
 pi start Qwen/Qwen2.5-72B-Instruct --name qwen72b          # Known model - pi handles vLLM args
 pi start some/unknown-model --name mymodel --vllm --tensor-parallel-size 4 --max-model-len 32768  # Custom vLLM args
@@ -30,6 +32,7 @@ For known models, pi automatically configures appropriate vLLM arguments from mo
 Pi manages GPU pods from various providers (DataCrunch, Vast.ai, Prime Intellect, RunPod) as ephemeral compute resources. Users manually create pods via provider dashboards, then register them with pi for automated setup and management.
 
 Key capabilities:
+
 - **Pod setup**: Transform bare Ubuntu/Debian machines into vLLM-ready environments in ~2 minutes
 - **Model caching**: Optional persistent storage shared by pods to avoid re-downloading 100GB+ models
 - **Multi-pod management**: Register multiple pods, switch between them, maintain different environments
@@ -43,6 +46,7 @@ pi pods setup dc1 "ssh root@1.2.3.4" --mount "mount -t nfs..."
 ```
 
 This copies and executes `pod_setup.sh` which:
+
 1. Detects GPUs via `nvidia-smi` and stores count/memory in local config
 2. Installs CUDA toolkit matching the driver version
 3. Creates Python environment
@@ -57,6 +61,7 @@ This copies and executes `pod_setup.sh` which:
 5. Configures environment variables persistently
 
 Required environment variables:
+
 - `HF_TOKEN`: HuggingFace token for model downloads
 - `PI_API_KEY`: API key for securing vLLM endpoints
 
@@ -88,7 +93,9 @@ All model commands (`pi start`, `pi stop`, etc.) target the active pod, unless `
 Pi uses direct SSH commands to manage vLLM instances on pods. No remote manager component is needed - everything is controlled from the local pi CLI.
 
 ### Architecture
+
 The pi CLI maintains all state locally in `~/.pi/pods.json`:
+
 ```json
 {
   "pods": {
@@ -117,7 +124,9 @@ The location of the pi config dir can also be specified via the `PI_CONFIG_DIR` 
 Pods are assumed to be fully managed by pi - no other processes compete for ports or GPUs.
 
 ### Starting models
+
 When user runs `pi start Qwen/Qwen2.5-72B --name qwen`:
+
 1. CLI determines next available port (starting from 8001)
 2. Selects GPU (round-robin based on stored GPU info)
 3. Downloads model if not cached:
@@ -131,23 +140,28 @@ When user runs `pi start Qwen/Qwen2.5-72B --name qwen`:
 8. On failure: shows exact error from vLLM logs, doesn't save to config
 
 ### Managing models
+
 - **List**: Show models from local state, optionally verify PIDs still running
 - **Stop**: SSH to kill process by PID
 - **Logs**: SSH to tail -f log files (Ctrl+C stops tailing, doesn't kill vLLM)
 
 ### Error handling
+
 - **SSH failures**: Prompt user to check connection or remove pod from config
 - **Stale state**: Commands that fail with "process not found" auto-clean local state
 - **Setup failures**: Ctrl+C during setup kills remote script and exits cleanly
 
 ### Testing models
+
 The `pi prompt` command provides a quick way to test deployed models:
+
 ```bash
 pi prompt qwen "What is 2+2?"                    # Simple prompt
 pi prompt qwen "Read file.txt and summarize"     # Uses built-in tools
 ```
 
 Built-in tools for agentic testing:
+
 - `ls(path, ignore?)`: List files and directories at path, with optional ignore patterns
 - `read(file_path, offset?, limit?)`: Read file contents with optional line offset/limit
 - `glob(pattern, path?)`: Find files matching glob pattern (e.g., "**/*.py", "src/**/*.ts")
@@ -160,6 +174,7 @@ This allows testing basic agent capabilities without external tool configuration
 `prompt` is implemented using the latest OpenAI SDK for NodeJS. It outputs thinking content, tool calls and results, and normal assistant messages.
 
 ## Models
+
 We want to support these models specifically, with alternative models being marked as "possibly works". This list will be updated with new models regularly. A checked
 box means "supported".
 

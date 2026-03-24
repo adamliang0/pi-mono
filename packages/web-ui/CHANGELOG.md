@@ -294,6 +294,7 @@
 ### Migration Guide
 
 **Before (0.30.x):**
+
 ```typescript
 import { Agent, ProviderTransport, type AppMessage } from '@mariozechner/pi-web-ui';
 
@@ -304,6 +305,7 @@ const agent = new Agent({
 ```
 
 **After:**
+
 ```typescript
 import { Agent, type AgentMessage } from '@mariozechner/pi-agent-core';
 import { defaultConvertToLlm } from '@mariozechner/pi-web-ui';
@@ -318,6 +320,7 @@ const agent = new Agent({
 ```
 
 **Custom message types:**
+
 ```typescript
 // Before: declaration merging on CustomMessages
 declare module "@mariozechner/pi-web-ui" {

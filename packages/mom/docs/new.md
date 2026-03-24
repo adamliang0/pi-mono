@@ -12,7 +12,7 @@
 
 The current architecture tightly couples Slack-specific code throughout:
 
-```
+```text
 main.ts → SlackBot → handler.handleEvent() → agent.run(SlackContext)
                                                     ↓
                                               SlackContext.respond()
@@ -22,6 +22,7 @@ main.ts → SlackBot → handler.handleEvent() → agent.run(SlackContext)
 ```
 
 Problems:
+
 - `SlackContext` interface leaks Slack concepts (threads, typing indicators)
 - Agent code references Slack-specific formatting (mrkdwn, `<@user>` mentions)
 - Storage uses Slack timestamps (`ts`) as message IDs
@@ -30,7 +31,7 @@ Problems:
 
 ## Proposed Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                              CLI / Entry Point                          │
 │  mom ./data                                                             │
@@ -87,13 +88,13 @@ Problems:
 interface ChannelMessage {
   /** Unique ID within the channel (platform-specific format preserved) */
   id: string;
-  
+
   /** Channel/conversation ID */
   channelId: string;
-  
+
   /** Timestamp (ISO 8601) */
   timestamp: string;
-  
+
   /** Sender info */
   sender: {
     id: string;
@@ -101,22 +102,22 @@ interface ChannelMessage {
     displayName?: string;
     isBot: boolean;
   };
-  
+
   /** Message content (as received from platform) */
   text: string;
-  
+
   /** Optional: original platform-specific text (for debugging) */
   rawText?: string;
-  
+
   /** Attachments */
   attachments: ChannelAttachment[];
-  
+
   /** Is this a direct mention/trigger of the bot? */
   isMention: boolean;
-  
+
   /** Optional: reply-to message ID (for threaded conversations) */
   replyTo?: string;
-  
+
   /** Platform-specific metadata (for platform-specific features) */
   metadata?: Record<string, unknown>;
 }
@@ -124,13 +125,13 @@ interface ChannelMessage {
 interface ChannelAttachment {
   /** Original filename */
   filename: string;
-  
+
   /** Local path (relative to channel dir) */
   localPath: string;
-  
+
   /** MIME type if known */
   mimeType?: string;
-  
+
   /** File size in bytes */
   size?: number;
 }
@@ -144,16 +145,16 @@ Adapters handle platform connection and UI. They receive events from MomAgent an
 interface PlatformAdapter {
   /** Adapter name (used in channel paths, e.g., "slack-acme") */
   name: string;
-  
+
   /** Start the adapter (connect to platform) */
   start(): Promise<void>;
-  
+
   /** Stop the adapter */
   stop(): Promise<void>;
-  
+
   /** Get all known channels */
   getChannels(): ChannelInfo[];
-  
+
   /** Get all known users */
   getUsers(): UserInfo[];
 }
@@ -188,10 +189,10 @@ interface MomAgent {
     context: ChannelContext,
     onEvent: (event: AgentSessionEvent) => Promise<void>
   ): Promise<{ stopReason: string; errorMessage?: string }>;
-  
+
   /** Abort the current run for a channel */
   abort(channelId: string): void;
-  
+
   /** Check if a channel is currently running */
   isRunning(channelId: string): boolean;
 }
@@ -217,7 +218,7 @@ async function handleEvent(event: AgentSessionEvent, ctx: SlackContext) {
       await ctx.updateMain(`_→ ${label}_`);
       break;
     }
-    
+
     case 'tool_execution_end': {
       // Format tool result for thread
       const result = extractText(event.result);
@@ -225,13 +226,13 @@ async function handleEvent(event: AgentSessionEvent, ctx: SlackContext) {
       await ctx.appendThread(this.toSlackFormat(formatted));
       break;
     }
-    
+
     case 'message_end': {
       if (event.message.role === 'assistant') {
         const text = extractAssistantText(event.message);
         await ctx.replaceMain(this.toSlackFormat(text));
         await ctx.appendThread(this.toSlackFormat(text));
-        
+
         // Usage from AssistantMessage
         if (event.message.usage) {
           await ctx.appendThread(formatUsage(event.message.usage));
@@ -239,7 +240,7 @@ async function handleEvent(event: AgentSessionEvent, ctx: SlackContext) {
       }
       break;
     }
-    
+
     case 'auto_compaction_start':
       await ctx.updateMain('_Compacting context..._');
       break;
@@ -248,6 +249,7 @@ async function handleEvent(event: AgentSessionEvent, ctx: SlackContext) {
 ```
 
 Each adapter decides:
+
 - Message formatting (markdown → mrkdwn, embeds, etc.)
 - Message splitting for platform limits
 - What goes in main message vs thread
@@ -276,7 +278,7 @@ Same format as current (coding-agent compatible):
 
 ## Directory Structure
 
-```
+```text
 data/
 ├── config.json                    # Host only - tokens, adapters, access control
 └── workspace/                     # Mounted as /workspace in Docker
@@ -321,6 +323,7 @@ data/
 ```
 
 **Access control:**
+
 - `admins`: User IDs with admin privileges. Can always DM.
 - `dm`: Who else can DM. `"everyone"`, `"none"`, or `["U789", "U012"]`
 
@@ -335,6 +338,7 @@ data/
 In Linux-based execution environments (Docker), we can use [bubblewrap](https://github.com/containers/bubblewrap) to enforce per-user channel access at the OS level.
 
 **How it works:**
+
 1. Adapter knows which channels the requesting user has access to
 2. Before executing bash, wrap command with bwrap
 3. Mount entire filesystem, then overlay denied channels with empty tmpfs
@@ -364,10 +368,12 @@ const sandboxedCmd = wrapWithBwrap('cat /workspace/channels/private/log.jsonl', 
 ```
 
 **Requirements:**
+
 - Docker container needs `--cap-add=SYS_ADMIN` for bwrap to create namespaces
 - Install in Dockerfile: `apk add bubblewrap`
 
 **Limitations:**
+
 - Linux only (not macOS host mode)
 - Requires SYS_ADMIN capability in Docker
 - Per-execution overhead (though minimal)
@@ -408,27 +414,30 @@ The adapter converts markdown to platform format internally:
 // Inside SlackAdapter
 private formatForSlack(markdown: string): string {
   let text = markdown;
-  
+
   // Bold: **text** → *text*
   text = text.replace(/\*\*(.+?)\*\*/g, '*$1*');
-  
+
   // Links: [text](url) → <url|text>
   text = text.replace(/\[(.+?)\]\((.+?)\)/g, '<$2|$1>');
-  
+
   // Mentions: @username → <@U123>
   text = text.replace(/@(\w+)/g, (match, username) => {
     const user = this.users.find(u => u.username === username);
     return user ? `<@${user.id}>` : match;
   });
-  
+
   return text;
 }
 ```
-```
+
+```text
 
 ## Testing Strategy
 
 ### 1. Agent Tests (with temp Docker container)
+
+```
 
 ```typescript
 // test/agent.test.ts
@@ -437,11 +446,11 @@ import { createTestContainer, destroyTestContainer } from './docker-utils.js';
 
 describe('MomAgent', () => {
   let containerName: string;
-  
+
   beforeAll(async () => {
     containerName = await createTestContainer();
   });
-  
+
   afterAll(async () => {
     await destroyTestContainer(containerName);
   });
@@ -451,9 +460,9 @@ describe('MomAgent', () => {
       workDir: tmpDir,
       sandbox: { type: 'docker', container: containerName }
     });
-    
+
     const events: AgentSessionEvent[] = [];
-    
+
     await agent.handleMessage(
       {
         id: '1',
@@ -467,7 +476,7 @@ describe('MomAgent', () => {
       { adapter: 'test', users: [], channels: [] },
       async (event) => { events.push(event); }
     );
-    
+
     const messageEnds = events.filter(e => e.type === 'message_end');
     expect(messageEnds.length).toBeGreaterThan(0);
   });
@@ -487,28 +496,28 @@ describe('SlackAdapter', () => {
       channel: 'C789',
       ts: '1234567890.123456',
     };
-    
+
     const message = SlackAdapter.parseEvent(slackEvent, userCache);
-    
+
     expect(message.text).toBe('Hello @someuser');
     expect(message.channelId).toBe('C789');
     expect(message.sender.id).toBe('U456');
   });
-  
+
   it('converts markdown to Slack format', () => {
     const slack = SlackAdapter.toSlackFormat('**bold** and [link](http://example.com)');
     expect(slack).toBe('*bold* and <http://example.com|link>');
   });
-  
+
   it('handles message_end event', async () => {
     const mockClient = new MockSlackClient();
     const adapter = new SlackAdapter({ client: mockClient });
-    
+
     await adapter.handleEvent({
       type: 'message_end',
       message: { role: 'assistant', content: [{ type: 'text', text: '**Hello**' }] }
     }, channelContext);
-    
+
     // Verify Slack formatting applied
     expect(mockClient.postMessage).toHaveBeenCalledWith('C123', '*Hello*');
   });
@@ -521,11 +530,11 @@ describe('SlackAdapter', () => {
 // test/integration.test.ts
 describe('Mom Integration', () => {
   let containerName: string;
-  
+
   beforeAll(async () => {
     containerName = await createTestContainer();
   });
-  
+
   afterAll(async () => {
     await destroyTestContainer(containerName);
   });
@@ -536,10 +545,10 @@ describe('Mom Integration', () => {
       sandbox: { type: 'docker', container: containerName }
     });
     const adapter = new CLIAdapter({ agent, input: mockStdin, output: mockStdout });
-    
+
     await adapter.start();
     mockStdin.emit('data', 'Hello mom\n');
-    
+
     await waitFor(() => mockStdout.data.length > 0);
     expect(mockStdout.data).toContain('Hello');
   });
@@ -578,7 +587,7 @@ describe('Mom Integration', () => {
 
 ## File Structure
 
-```
+```text
 packages/mom/src/
 ├── main.ts                    # CLI entry point
 ├── agent.ts                   # MomAgent
@@ -609,7 +618,7 @@ Mom runs bash commands inside a sandbox (Docker container), but sometimes you ne
 
 ### Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                              Host Machine                               │
 │  ┌───────────────────────────────────────────────────────────────────┐  │
@@ -660,7 +669,7 @@ const tool: MomCustomTool = {
     subject: Type.Optional(Type.String({ description: "Email subject" })),
     body: Type.Optional(Type.String({ description: "Email body" })),
   }),
-  
+
   async execute(toolCallId, params, signal) {
     switch (params.action) {
       case "search":
@@ -701,23 +710,23 @@ export interface MomToolResult<TDetails = any> {
 export interface MomCustomTool<TParams extends TSchema = TSchema, TDetails = any> {
   /** Tool name (must be unique) */
   name: string;
-  
+
   /** Human-readable description for system prompt */
   description: string;
-  
+
   /** TypeBox schema for parameters */
   parameters: TParams;
-  
+
   /** Execute the tool */
   execute: (
     toolCallId: string,
     params: Static<TParams>,
     signal?: AbortSignal,
   ) => Promise<MomToolResult<TDetails>>;
-  
+
   /** Optional: called when mom starts (for initialization) */
   onStart?: () => Promise<void>;
-  
+
   /** Optional: called when mom stops (for cleanup) */
   onStop?: () => Promise<void>;
 }
@@ -728,13 +737,13 @@ export type MomCustomToolFactory = (api: ToolAPI) => MomCustomTool | Promise<Mom
 export interface ToolAPI {
   /** Path to mom's data directory */
   dataDir: string;
-  
+
   /** Execute a command on the host (not in sandbox) */
   exec: (command: string, args: string[], options?: ExecOptions) => Promise<ExecResult>;
-  
+
   /** Read a file from the data directory */
   readFile: (path: string) => Promise<string>;
-  
+
   /** Write a file to the data directory */
   writeFile: (path: string, content: string) => Promise<void>;
 }
@@ -743,6 +752,7 @@ export interface ToolAPI {
 ### Tool Discovery and Loading
 
 Tools are discovered from:
+
 1. `data/tools/**/index.ts` (workspace-local, recursive)
 2. `~/.pi/mom/tools/**/index.ts` (global, recursive)
 
@@ -758,37 +768,37 @@ interface LoadedTool {
 async function loadCustomTools(dataDir: string): Promise<LoadedTool[]> {
   const tools: LoadedTool[] = [];
   const jiti = createJiti(import.meta.url, { alias: getAliases() });
-  
+
   // Discover tool directories
   const toolDirs = [
     path.join(dataDir, "tools"),
     path.join(os.homedir(), ".pi", "mom", "tools"),
   ];
-  
+
   for (const dir of toolDirs) {
     if (!fs.existsSync(dir)) continue;
-    
+
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      
+
       const indexPath = path.join(dir, entry.name, "index.ts");
       if (!fs.existsSync(indexPath)) continue;
-      
+
       try {
         const module = await jiti.import(indexPath, { default: true });
         const toolOrFactory = module as MomCustomTool | MomCustomToolFactory;
-        
+
         const tool = typeof toolOrFactory === "function"
           ? await toolOrFactory(createToolAPI(dataDir))
           : toolOrFactory;
-        
+
         tools.push({ path: indexPath, tool });
       } catch (err) {
         console.error(`Failed to load tool from ${indexPath}:`, err);
       }
     }
   }
-  
+
   return tools;
 }
 ```
@@ -802,7 +812,7 @@ import { Type } from "@sinclair/typebox";
 
 function createInvokeToolTool(loadedTools: LoadedTool[]): AgentTool {
   const toolMap = new Map(loadedTools.map(t => [t.tool.name, t.tool]));
-  
+
   return {
     name: "invoke_tool",
     label: "Invoke Tool",
@@ -811,7 +821,7 @@ function createInvokeToolTool(loadedTools: LoadedTool[]): AgentTool {
       tool: Type.String({ description: "Name of the tool to invoke" }),
       args: Type.Any({ description: "Arguments to pass to the tool (tool-specific)" }),
     }),
-    
+
     async execute(toolCallId, params, signal) {
       const tool = toolMap.get(params.tool);
       if (!tool) {
@@ -821,11 +831,11 @@ function createInvokeToolTool(loadedTools: LoadedTool[]): AgentTool {
           isError: true,
         };
       }
-      
+
       try {
         // Validate args against tool's schema
         // (TypeBox validation here)
-        
+
         const result = await tool.execute(toolCallId, params.args, signal);
         return {
           content: result.content,
@@ -850,7 +860,7 @@ Custom tools are described in the system prompt so mom knows what's available:
 ```typescript
 function formatCustomToolsForPrompt(tools: LoadedTool[]): string {
   if (tools.length === 0) return "";
-  
+
   let section = `\n## Custom Tools (Host-Side)
 
 These tools run on the host machine (not in your sandbox). Use the \`invoke_tool\` tool to call them.
@@ -873,7 +883,7 @@ invoke_tool(tool: "${tool.name}", args: { ... })
 
 `;
   }
-  
+
   return section;
 }
 
@@ -898,7 +908,7 @@ export default async function(api: ToolAPI): Promise<MomCustomTool> {
   // Load credentials from data directory
   const credsPath = path.join(api.dataDir, "tools", "gmail", "credentials.json");
   const creds = JSON.parse(await api.readFile(credsPath));
-  
+
   return {
     name: "gmail",
     description: "Search, read, and send emails via Gmail. Requires credentials.json in the tool directory.",
@@ -906,7 +916,7 @@ export default async function(api: ToolAPI): Promise<MomCustomTool> {
       action: StringEnum(["search", "read", "send", "list"]),
       // ... other params
     }),
-    
+
     async execute(toolCallId, params, signal) {
       // Implementation using imap/nodemailer
     },
@@ -947,6 +957,7 @@ mom ./data
 Reads `config.json`, starts all adapters defined there.
 
 The shared workspace allows:
+
 - Shared MEMORY.md (global knowledge)
 - Shared skills
 - Events can target any platform
@@ -962,6 +973,7 @@ The key insight is **separation of concerns**:
 4. **Progress Rendering**: Each adapter decides how to display tool progress and results
 
 This allows:
+
 - Testing agent without any platform
 - Testing adapters without agent
 - Adding new platforms by implementing `PlatformAdapter`

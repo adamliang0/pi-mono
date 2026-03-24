@@ -17,7 +17,7 @@ This is a living document and we welcome contributions, corrections, and creatio
 
 We highly recommend using a new virtual environment, as the first iteration of the release requires cutting edge kernels from various dependencies, these might not work with other models. In particular, we will be installing: a prerelease version of vLLM, PyTorch nightly, Triton nightly, FlashInfer prerelease, HuggingFace prerelease, Harmony, and gpt-oss library tools.
 
-```
+```text
 uv venv
 source .venv/bin/activate
 
@@ -29,7 +29,7 @@ uv pip install --pre vllm==0.10.1+gptoss \
 
 We also provide a docker container with all the dependencies built in
 
-```
+```text
 docker run --gpus all \
     -p 8000:8000 \
     --ipc=host \
@@ -44,7 +44,7 @@ You can serve the model with its default parameters:
 * `--async-scheduling` can be enabled for higher performance. Currently it is not compatible with structured output.
 * We recommend TP=2 for H100 and H200 as the best performance tradeoff point.
 
-```
+```text
 # openai/gpt-oss-20b should run in single GPU
 vllm serve openai/gpt-oss-20b --async-scheduling
 
@@ -58,7 +58,7 @@ vllm serve openai/gpt-oss-120b --tensor-parallel-size 4 --async-scheduling
 
 NVIDIA Blackwell requires installation of FlashInfer library and several environments to enable the necessary kernels. We recommend TP=1 as a starting point for a performant option. We are actively working on the performance of vLLM on Blackwell.
 
-```
+```text
 # All 3 of these are required
 export VLLM_USE_TRTLLM_ATTENTION=1
 export VLLM_USE_TRTLLM_DECODE_ATTENTION=1
@@ -89,7 +89,7 @@ ROCm supports OpenAI gpt-oss-120b or gpt-oss-20b models on these 3 different GPU
 
 To run the container:
 
-```
+```text
 alias drun='sudo docker run -it --network=host --device=/dev/kfd --device=/dev/dri --group-add=video --ipc=host --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --shm-size 32G -v /data:/data -v $HOME:/myhome -w /myhome'
 
 drun rocm/vllm-dev:open-mi300-08052025
@@ -97,7 +97,7 @@ drun rocm/vllm-dev:open-mi300-08052025
 
 For MI300x and R9700:
 
-```
+```text
 export VLLM_ROCM_USE_AITER=1
 export VLLM_USE_AITER_UNIFIED_ATTENTION=1
 export VLLM_ROCM_USE_AITER_MHA=0
@@ -107,7 +107,7 @@ vllm serve openai/gpt-oss-120b --compilation-config '{"full_cuda_graph": true}'
 
 For MI355x:
 
-```
+```text
 # MoE preshuffle, fusion and Triton GEMM flags
 export VLLM_USE_AITER_TRITON_FUSED_SPLIT_QKV_ROPE=1
 export VLLM_USE_AITER_TRITON_FUSED_ADD_RMSNORM_PAD=1
@@ -136,7 +136,7 @@ One premier feature of gpt-oss is the ability to call tools directly, called "bu
 
 * By default, we integrate with the reference library's browser (with `ExaBackend`) and demo Python interpreter via docker container. In order to use the search backend, you need to get access to [exa.ai](http://exa.ai) and put `EXA_API_KEY=` as an environment variable. For Python, either have docker available, or set `PYTHON_EXECUTION_BACKEND=UV` to dangerously allow execution of model generated code snippets to be executed on the same machine.
 
-```
+```text
 uv pip install gpt-oss
 
 vllm serve ... --tool-server demo
@@ -145,7 +145,7 @@ vllm serve ... --tool-server demo
 * Please note that the default options are simply for demo purposes. For production usage, vLLM itself can act as MCP client to multiple services.
 Here is an [example tool server](https://github.com/openai/gpt-oss/tree/main/gpt-oss-mcp-server) that vLLM can work with, they wrap the demo tools:
 
-```
+```text
 mcp run -t sse browser_server.py:mcp
 mcp run -t sse python_server.py:mcp
 
@@ -158,15 +158,16 @@ The URLs are expected to be MCP SSE servers that implement `instructions` in ser
 
 OpenAI recommends using the gpt-oss reference library to perform evaluation. For example,
 
-```
+```text
 python -m gpt_oss.evals --model 120b-low --eval gpqa --n-threads 128
 python -m gpt_oss.evals --model 120b --eval gpqa --n-threads 128
 python -m gpt_oss.evals --model 120b-high --eval gpqa --n-threads 128
 ```
+
 To eval on AIME2025, change `gpqa` to `aime25`.
 With vLLM deployed:
 
-```
+```text
 # Example deployment on 8xH100
 vllm serve openai/gpt-oss-120b \
   --tensor_parallel_size 8 \
@@ -201,7 +202,7 @@ Model: 20B
 
 * On H100 using tensor parallel size 1, default gpu memory utilization, and batched token will cause CUDA Out-of-memory. When running tp1, please increase your gpu memory utilization or lower batched token
 
-```
+```text
 vllm serve openai/gpt-oss-120b --gpu-memory-utilization 0.95 --max-num-batched-tokens 1024
 ```
 
@@ -217,9 +218,9 @@ vllm serve openai/gpt-oss-120b --gpu-memory-utilization 0.95 --max-num-batched-t
 
 ## Troubleshooting
 
-- Attention sink dtype error on Blackwell:
+* Attention sink dtype error on Blackwell:
 
-```
+```text
   ERROR 08-05 07:31:10 [multiproc_executor.py:559]     assert sinks.dtype == torch.float32, "Sinks must be of type float32"
   **(VllmWorker TP0 pid=174579)** ERROR 08-05 07:31:10 [multiproc_executor.py:559]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   **(VllmWorker TP0 pid=174579)** ERROR 08-05 07:31:10 [multiproc_executor.py:559] AssertionError: Sinks must be of type float32
@@ -227,7 +228,6 @@ vllm serve openai/gpt-oss-120b --gpu-memory-utilization 0.95 --max-num-batched-t
 
 **Solution: Please refer to Blackwell section to check if related environment variables are added.**
 
-- Triton issue related to `tl.language` not defined:
+* Triton issue related to `tl.language` not defined:
 
 **Solution: Make sure there's no other triton installed in your environment (pytorch-triton, etc).**
-

@@ -11,6 +11,7 @@ npm install -g @mariozechner/pi
 ## What is pi?
 
 `pi` simplifies running large language models on remote GPU pods. It automatically:
+
 - Sets up vLLM on fresh Ubuntu pods
 - Configures tool calling for agentic models (Qwen, GPT-OSS, GLM, etc.)
 - Manages multiple models on the same pod with "smart" GPU allocation
@@ -57,16 +58,19 @@ export OPENAI_API_KEY=$PI_API_KEY
 ### Primary Support
 
 **DataCrunch** - Best for shared model storage
+
 - NFS volumes sharable across multiple pods in same region
 - Models download once, use everywhere
 - Ideal for teams or multiple experiments
 
 **RunPod** - Good persistent storage
+
 - Network volumes persist independently
 - Cannot share between running pods simultaneously
 - Good for single-pod workflows
 
 ### Also Works With
+
 - Vast.ai (volumes locked to specific machine)
 - Prime Intellect (no persistent storage)
 - AWS EC2 (with EFS setup)
@@ -134,6 +138,7 @@ The agent includes tools for file operations (read, list, bash, glob, rg) to tes
 `pi` includes predefined configurations for popular agentic models, so you do not have to specify `--vllm` arguments manually. `pi` will also check if the model you selected can actually run on your pod with respect to the number of GPUs and available VRAM. Run `pi start` without additional arguments to see a list of predefined models that can run on the active pod.
 
 ### Qwen Models
+
 ```bash
 # Qwen2.5-Coder-32B - Excellent coding model, fits on single H100/H200
 pi start Qwen/Qwen2.5-Coder-32B-Instruct --name qwen
@@ -146,6 +151,7 @@ pi start Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8 --name qwen-480b
 ```
 
 ### GPT-OSS Models
+
 ```bash
 # Requires special vLLM build during setup
 pi pods setup gpt-pod "ssh root@1.2.3.4" --models-path /workspace --vllm gpt-oss
@@ -158,6 +164,7 @@ pi start openai/gpt-oss-120b --name gpt120
 ```
 
 ### GLM Models
+
 ```bash
 # GLM-4.5 - Requires 8-16 GPUs, includes thinking mode
 pi start zai-org/GLM-4.5 --name glm
@@ -189,16 +196,19 @@ pi start some/model --name mymodel --vllm \
 DataCrunch offers the best experience with shared NFS storage across pods:
 
 ### 1. Create Shared Filesystem (SFS)
+
 - Go to DataCrunch dashboard → Storage → Create SFS
 - Choose size and datacenter
 - Note the mount command (e.g., `sudo mount -t nfs -o nconnect=16 nfs.fin-02.datacrunch.io:/hf-models-fin02-8ac1bab7 /mnt/hf-models-fin02`)
 
 ### 2. Create GPU Instance
+
 - Create instance in same datacenter as SFS
 - Share the SFS with the instance
 - Get SSH command from dashboard
 
 ### 3. Setup with pi
+
 ```bash
 # Get mount command from DataCrunch dashboard
 pi pods setup dc1 "ssh root@instance.datacrunch.io" \
@@ -208,6 +218,7 @@ pi pods setup dc1 "ssh root@instance.datacrunch.io" \
 ```
 
 ### 4. Benefits
+
 - Models persist across instance restarts
 - Share models between multiple instances in same datacenter
 - Download once, use everywhere
@@ -218,15 +229,18 @@ pi pods setup dc1 "ssh root@instance.datacrunch.io" \
 RunPod offers good persistent storage with network volumes:
 
 ### 1. Create Network Volume (optional)
+
 - Go to RunPod dashboard → Storage → Create Network Volume
 - Choose size and region
 
 ### 2. Create GPU Pod
+
 - Select "Network Volume" during pod creation (if using)
 - Attach your volume to `/runpod-volume`
 - Get SSH command from pod details
 
 ### 3. Setup with pi
+
 ```bash
 # With network volume
 pi pods setup runpod "ssh root@pod.runpod.io" --models-path /runpod-volume
@@ -235,11 +249,12 @@ pi pods setup runpod "ssh root@pod.runpod.io" --models-path /runpod-volume
 pi pods setup runpod "ssh root@pod.runpod.io" --models-path /workspace
 ```
 
-
 ## Multi-GPU Support
 
 ### Automatic GPU Assignment
+
 When running multiple models, pi automatically assigns them to different GPUs:
+
 ```bash
 pi start model1 --name m1  # Auto-assigns to GPU 0
 pi start model2 --name m2  # Auto-assigns to GPU 1
@@ -247,7 +262,9 @@ pi start model3 --name m3  # Auto-assigns to GPU 2
 ```
 
 ### Specify GPU Count for Predefined Models
+
 For predefined models with multiple configurations, use `--gpus` to control GPU usage:
+
 ```bash
 # Run Qwen on 1 GPU instead of all available
 pi start Qwen/Qwen2.5-Coder-32B-Instruct --name qwen --gpus 1
@@ -259,7 +276,9 @@ pi start zai-org/GLM-4.5 --name glm --gpus 8
 If the model doesn't have a configuration for the requested GPU count, you'll see available options.
 
 ### Tensor Parallelism for Large Models
+
 For models that don't fit on a single GPU:
+
 ```bash
 # Use all available GPUs
 pi start meta-llama/Llama-3.1-70B-Instruct --name llama70b --vllm \
@@ -337,6 +356,7 @@ pi-agent --api responses --model openai/gpt-oss-20b "Hello"
 ```
 
 The agent supports:
+
 - Session persistence across conversations
 - Interactive TUI mode with syntax highlighting
 - File system tools (read, list, bash, glob, rg) for code navigation
@@ -353,6 +373,7 @@ The agent supports:
 - **Custom models**: Specify with `--vllm --tool-call-parser <parser> --enable-auto-tool-choice`
 
 To disable tool calling:
+
 ```bash
 pi start model --name mymodel --vllm --disable-tool-call-parser
 ```
@@ -360,18 +381,23 @@ pi start model --name mymodel --vllm --disable-tool-call-parser
 ## Memory and Context Management
 
 ### GPU Memory Allocation
+
 Controls how much GPU memory vLLM pre-allocates:
+
 - `--memory 30%`: High concurrency, limited context
 - `--memory 50%`: Balanced (default)
 - `--memory 90%`: Maximum context, low concurrency
 
 ### Context Window
+
 Sets maximum input + output tokens:
+
 - `--context 4k`: 4,096 tokens total
 - `--context 32k`: 32,768 tokens total
 - `--context 128k`: 131,072 tokens total
 
 Example for coding workload:
+
 ```bash
 # Large context for code analysis, moderate concurrency
 pi start Qwen/Qwen2.5-Coder-32B-Instruct --name coder \
@@ -393,6 +419,7 @@ pi agent qwen -i -c
 ```
 
 Sessions are stored in `~/.pi/sessions/` organized by project path and include:
+
 - Complete conversation history
 - Tool call results
 - Token usage statistics
@@ -400,6 +427,7 @@ Sessions are stored in `~/.pi/sessions/` organized by project path and include:
 ## Architecture & Event System
 
 The agent uses a unified event-based architecture where all interactions flow through `AgentEvent` types. This enables:
+
 - Consistent UI rendering across console and TUI modes
 - Session recording and replay
 - Clean separation between API calls and UI updates
@@ -410,11 +438,13 @@ Events are automatically converted to the appropriate API format (Chat Completio
 ### JSON Output Mode
 
 Use `--json` flag to output the event stream as JSONL (JSON Lines) for programmatic consumption:
+
 ```bash
 pi-agent --api-key sk-... --json "What is 2+2?"
 ```
 
 Each line is a complete JSON object representing an event:
+
 ```jsonl
 {"type":"user_message","text":"What is 2+2?"}
 {"type":"assistant_start"}
@@ -425,11 +455,13 @@ Each line is a complete JSON object representing an event:
 ## Troubleshooting
 
 ### OOM (Out of Memory) Errors
+
 - Reduce `--memory` percentage
 - Use smaller model or quantized version (FP8)
 - Reduce `--context` size
 
 ### Model Won't Start
+
 ```bash
 # Check GPU usage
 pi ssh "nvidia-smi"
@@ -442,20 +474,26 @@ pi stop
 ```
 
 ### Tool Calling Issues
+
 - Not all models support tool calling reliably
 - Try different parser: `--vllm --tool-call-parser mistral`
 - Or disable: `--vllm --disable-tool-call-parser`
 
 ### Access Denied for Models
+
 Some models (Llama, Mistral) require HuggingFace access approval. Visit the model page and click "Request access".
 
 ### vLLM Build Issues
+
 If using `--vllm nightly` fails, try:
+
 - Use `--vllm release` for stable version
 - Check CUDA compatibility with `pi ssh "nvidia-smi"`
 
 ### Agent Not Finding Messages
+
 If the agent shows configuration instead of your message, ensure quotes around messages with special characters:
+
 ```bash
 # Good
 pi agent qwen "What is this file about?"
@@ -467,6 +505,7 @@ pi agent qwen What is this file about?
 ## Advanced Usage
 
 ### Working with Multiple Pods
+
 ```bash
 # Override active pod for any command
 pi start model --name test --pod dev-pod
@@ -475,6 +514,7 @@ pi stop test --pod dev-pod
 ```
 
 ### Custom vLLM Arguments
+
 ```bash
 # Pass any vLLM argument after --vllm
 pi start model --name custom --vllm \
@@ -485,6 +525,7 @@ pi start model --name custom --vllm \
 ```
 
 ### Monitoring
+
 ```bash
 # Watch GPU utilization
 pi ssh "watch -n 1 nvidia-smi"

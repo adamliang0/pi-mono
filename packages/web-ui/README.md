@@ -86,7 +86,7 @@ document.body.appendChild(chatPanel);
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │                    ChatPanel                        │
 │  ┌─────────────────────┐  ┌─────────────────────┐   │
@@ -160,6 +160,7 @@ chat.onBeforeSend = async () => { /* ... */ };
 ```
 
 Properties:
+
 - `session`: Agent instance
 - `enableAttachments`: Show attachment button (default: true)
 - `enableModelSelector`: Show model selector (default: true)

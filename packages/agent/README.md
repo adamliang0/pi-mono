@@ -36,6 +36,7 @@ await agent.prompt("Hello!");
 ### AgentMessage vs LLM Message
 
 The agent works with `AgentMessage`, a flexible type that can include:
+
 - Standard LLM messages (`user`, `assistant`, `toolResult`)
 - Custom app-specific message types via declaration merging
 
@@ -43,7 +44,7 @@ LLMs only understand `user`, `assistant`, and `toolResult`. The `convertToLlm` f
 
 ### Message Flow
 
-```
+```text
 AgentMessage[] → transformContext() → AgentMessage[] → convertToLlm() → Message[] → LLM
                     (optional)                           (required)
 ```
@@ -59,7 +60,7 @@ The agent emits events for UI updates. Understanding the event sequence helps bu
 
 When you call `prompt("Hello")`:
 
-```
+```text
 prompt("Hello")
 ├─ agent_start
 ├─ turn_start
@@ -77,7 +78,7 @@ prompt("Hello")
 
 If the assistant calls tools, the loop continues:
 
-```
+```text
 prompt("Read config.json")
 ├─ agent_start
 ├─ turn_start
@@ -310,8 +311,9 @@ agent.clearAllQueues();
 
 Use clearSteeringQueue, clearFollowUpQueue, or clearAllQueues to drop queued messages.
 
-When steering messages are detected after a turn completes:
-1. All tool calls from the current assistant message have already finished
+When steering messages are detected after a tool completes:
+
+1. Remaining tools are skipped with error results
 2. Steering messages are injected
 3. The LLM responds on the next turn
 

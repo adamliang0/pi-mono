@@ -1,6 +1,7 @@
 # Implementation Plan
 
 ## Core Principles
+
 - TypeScript throughout
 - Clean, minimal code
 - Self-contained modules
@@ -8,6 +9,7 @@
 - All state in local JSON
 
 ## Package 1: Pod Setup Script Generation
+
 Generate and execute pod_setup.sh via SSH
 
 - [ ] `src/setup/generate-setup-script.ts` - Generate bash script as string
@@ -33,6 +35,7 @@ Generate and execute pod_setup.sh via SSH
   - [ ] Save GPU info to local config
 
 ## Package 2: Config Management
+
 Local JSON state management
 
 - [ ] `src/config/types.ts` - TypeScript interfaces
@@ -48,6 +51,7 @@ Local JSON state management
   - [ ] Update model state
 
 ## Package 3: SSH Executor
+
 Clean SSH command execution
 
 - [ ] `src/ssh/executor.ts` - SSH command wrapper
@@ -58,6 +62,7 @@ Clean SSH command execution
   - [ ] Support background processes (nohup)
 
 ## Package 4: Pod Commands
+
 Pod management CLI commands
 
 - [ ] `src/commands/pods-setup.ts` - pi pods setup
@@ -78,6 +83,7 @@ Pod management CLI commands
   - [ ] Remove from config (not remote)
 
 ## Package 5: Model Management
+
 Model lifecycle management
 
 - [ ] `src/models/model-config.ts` - Known model configurations
@@ -98,6 +104,7 @@ Model lifecycle management
   - [ ] Add port and API key
 
 ## Package 6: Model Commands
+
 Model management CLI commands
 
 - [ ] `src/commands/start.ts` - pi start
@@ -123,6 +130,7 @@ Model management CLI commands
   - [ ] Handle Ctrl+C (stop tailing only)
 
 ## Package 7: Model Testing
+
 Quick model testing with tools
 
 - [ ] `src/prompt/tools.ts` - Tool definitions
@@ -141,6 +149,7 @@ Quick model testing with tools
   - [ ] Display formatted response
 
 ## Package 8: CLI Entry Point
+
 Main CLI with commander.js
 
 - [ ] `src/cli.ts` - Main entry point
@@ -152,6 +161,7 @@ Main CLI with commander.js
 - [ ] `src/index.ts` - Package exports
 
 ## Testing Strategy
+
 - [ ] Test pod_setup.sh generation locally
 - [ ] Test on local machine with GPU
 - [ ] Test SSH executor with mock commands
@@ -159,6 +169,7 @@ Main CLI with commander.js
 - [ ] Integration test on real pod
 
 ## Dependencies
+
 ```json
 {
   "dependencies": {
@@ -177,6 +188,7 @@ Main CLI with commander.js
 ```
 
 ## Build & Distribution
+
 - [ ] TypeScript config for Node.js target
 - [ ] Build to dist/
 - [ ] npm package with bin entry

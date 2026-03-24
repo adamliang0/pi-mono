@@ -37,7 +37,7 @@ import { CURSOR_MARKER, type Component, type Focusable } from "@mariozechner/pi-
 
 class MyInput implements Component, Focusable {
   focused: boolean = false;  // Set by TUI when focus changes
-  
+
   render(width: number): string[] {
     const marker = this.focused ? CURSOR_MARKER : "";
     // Emit marker right before the fake cursor
@@ -47,6 +47,7 @@ class MyInput implements Component, Focusable {
 ```
 
 When a `Focusable` component has focus, TUI:
+
 1. Sets `focused = true` on the component
 2. Scans rendered output for `CURSOR_MARKER` (a zero-width APC escape sequence)
 3. Positions the hardware terminal cursor at that location
@@ -280,6 +281,7 @@ handleInput(data: string) {
 ```
 
 **Key identifiers** (use `Key.*` for autocomplete, or string literals):
+
 - Basic keys: `Key.enter`, `Key.escape`, `Key.tab`, `Key.space`, `Key.backspace`, `Key.delete`, `Key.home`, `Key.end`
 - Arrow keys: `Key.up`, `Key.down`, `Key.left`, `Key.right`
 - With modifiers: `Key.ctrl("c")`, `Key.shift("tab")`, `Key.alt("left")`, `Key.ctrlShift("p")`
@@ -299,6 +301,7 @@ render(width: number): string[] {
 ```
 
 Utilities:
+
 - `visibleWidth(str)` - Get display width (ignores ANSI codes)
 - `truncateToWidth(str, width, ellipsis?)` - Truncate with optional ellipsis
 - `wrapTextWithAnsi(str, width)` - Word wrap preserving ANSI codes
@@ -318,7 +321,7 @@ class MySelector {
   private selected = 0;
   private cachedWidth?: number;
   private cachedLines?: string[];
-  
+
   public onSelect?: (item: string) => void;
   public onCancel?: () => void;
 
@@ -368,9 +371,9 @@ pi.registerCommand("pick", {
   handler: async (args, ctx) => {
     const items = ["Option A", "Option B", "Option C"];
     const selector = new MySelector(items);
-    
+
     let handle: { close: () => void; requestRender: () => void };
-    
+
     await new Promise<void>((resolve) => {
       selector.onSelect = (item) => {
         ctx.ui.notify(`Selected: ${item}`, "info");
@@ -397,7 +400,7 @@ Components accept theme objects for styling.
 renderResult(result, options, theme, context) {
   // Use theme.fg() for foreground colors
   return new Text(theme.fg("success", "Done!"), 0, 0);
-  
+
   // Use theme.bg() for background colors
   const styled = theme.bg("toolPendingBg", theme.fg("accent", "text"));
 }

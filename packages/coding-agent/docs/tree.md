@@ -17,7 +17,7 @@ Sessions are stored as trees where each entry has an `id` and `parentId`. The "l
 
 ## Tree UI
 
-```
+```text
 ├─ user: "Hello, can you help..."
 │  └─ assistant: "Of course! I can..."
 │     ├─ user: "Let's try approach A..."
@@ -58,17 +58,21 @@ Sessions are stored as trees where each entry has an `id` and `parentId`. The "l
 ## Selection Behavior
 
 ### User Message or Custom Message
+
 1. Leaf set to **parent** of selected node (or `null` if root)
 2. Message text placed in **editor** for re-submission
 3. User edits and submits, creating a new branch
 
 ### Non-User Message (assistant, compaction, etc.)
+
 1. Leaf set to **selected node**
 2. Editor stays empty
 3. User continues from that point
 
 ### Selecting Root User Message
+
 If user selects the very first message (has no parent):
+
 1. Leaf reset to `null` (empty conversation)
 2. Message text placed in editor
 3. User effectively restarts from scratch
@@ -85,7 +89,7 @@ When switching branches, user is presented with three options:
 
 Path from old leaf back to common ancestor with target:
 
-```
+```text
 A → B → C → D → E → F  ← old leaf
         ↘ G → H        ← target
 ```
@@ -93,6 +97,7 @@ A → B → C → D → E → F  ← old leaf
 Abandoned path: D → E → F (summarized)
 
 Summarization stops at:
+
 1. Common ancestor (always)
 2. Compaction node (if encountered first)
 
@@ -129,12 +134,14 @@ async navigateTree(
 ```
 
 Options:
+
 - `summarize`: Whether to generate a summary of the abandoned branch
 - `customInstructions`: Custom instructions for the summarizer
 - `replaceInstructions`: If true, `customInstructions` replaces the default prompt instead of being appended
 - `label`: Label to attach to the branch summary entry (or target entry if not summarizing)
 
 Flow:
+
 1. Validate target, check no-op (target === current leaf)
 2. Find common ancestor between old leaf and target
 3. Collect entries to summarize (if requested)
@@ -157,6 +164,7 @@ Flow:
 ### InteractiveMode
 
 `/tree` command shows `TreeSelectorComponent`, then:
+
 1. Prompt for summarization
 2. Call `session.navigateTree()`
 3. Clear and re-render chat
@@ -214,7 +222,7 @@ export default function(pi: HookAPI) {
   pi.on("session_before_tree", async (event, ctx) => {
     if (!event.preparation.userWantsSummary) return;
     if (event.preparation.entriesToSummarize.length === 0) return;
-    
+
     const summary = await myCustomSummarizer(event.preparation.entriesToSummarize);
     return { summary: { summary, details: { custom: true } } };
   });

@@ -11,6 +11,7 @@ The artifacts server lets Mom create HTML/JS/CSS files that you can instantly vi
 ### 1. Install Dependencies
 
 **Node.js packages:**
+
 ```bash
 cd /workspace/artifacts
 npm init -y
@@ -18,6 +19,7 @@ npm install express ws chokidar
 ```
 
 **Cloudflared (Cloudflare Tunnel):**
+
 ```bash
 wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
 mv cloudflared-linux-amd64 /usr/local/bin/cloudflared
@@ -58,12 +60,12 @@ const clients = new Set();
 wss.on('connection', (ws) => {
   console.log('WebSocket client connected');
   clients.add(ws);
-  
+
   ws.on('error', (err) => {
     console.error('WebSocket client error:', err.message);
     clients.delete(ws);
   });
-  
+
   ws.on('close', () => {
     console.log('WebSocket client disconnected');
     clients.delete(ws);
@@ -88,20 +90,20 @@ const watcher = chokidar.watch(FILES_DIR, {
 
 watcher.on('all', (event, filepath) => {
   console.log(`File ${event}: ${filepath}`);
-  
+
   // If a new directory is created, explicitly watch it
   // This ensures newly created artifact folders are monitored without restart
   if (event === 'addDir') {
     watcher.add(filepath);
     console.log(`Now watching directory: ${filepath}`);
   }
-  
+
   const relativePath = path.relative(FILES_DIR, filepath);
   const message = JSON.stringify({
     type: 'reload',
     file: relativePath
   });
-  
+
   clients.forEach(client => {
     if (client.readyState === 1) {
       try {
@@ -136,21 +138,21 @@ app.use((req, res, next) => {
   if (!req.path.endsWith('.html') || req.query.ws !== 'true') {
     return next();
   }
-  
+
   const filePath = path.join(FILES_DIR, req.path);
-  
+
   // Security: Prevent path traversal attacks
   const resolvedPath = path.resolve(filePath);
   const resolvedBase = path.resolve(FILES_DIR);
   if (!resolvedPath.startsWith(resolvedBase)) {
     return res.status(403).send('Forbidden: Path traversal detected');
   }
-  
+
   fs.readFile(filePath, 'utf8', (err, data) => {
     if (err) {
       return next();
     }
-    
+
     const liveReloadScript = `
 <script>
 (function() {
@@ -158,18 +160,18 @@ app.use((req, res, next) => {
   errorDiv.style.cssText = 'position:fixed;bottom:10px;left:10px;background:rgba(0,150,0,0.9);color:white;padding:15px;border-radius:8px;font-family:monospace;font-size:12px;max-width:90%;z-index:9999;word-break:break-all';
   errorDiv.textContent = 'Live reload: connecting...';
   document.body.appendChild(errorDiv);
-  
+
   function showStatus(msg, isError) {
     errorDiv.textContent = msg;
     errorDiv.style.background = isError ? 'rgba(255,0,0,0.9)' : 'rgba(0,150,0,0.9)';
     if (!isError) setTimeout(() => errorDiv.style.display = 'none', 3000);
   }
-  
+
   try {
     const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
     const wsUrl = protocol + window.location.host;
     const ws = new WebSocket(wsUrl);
-    
+
     ws.onopen = () => showStatus('Live reload connected!', false);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
@@ -185,13 +187,13 @@ app.use((req, res, next) => {
   }
 })();
 </script>`;
-    
+
     if (data.includes('</body>')) {
       data = data.replace('</body>', liveReloadScript + '</body>');
     } else {
       data = data + liveReloadScript;
     }
-    
+
     res.type('html').send(data);
   });
 });
@@ -245,6 +247,7 @@ server.listen(PORT, () => {
 ```
 
 Make executable:
+
 ```bash
 chmod +x /workspace/artifacts/server.js
 ```
@@ -292,7 +295,7 @@ if [ -n "$PUBLIC_URL" ]; then
   echo "Example: $PUBLIC_URL/test.html?ws=true"
   echo "=========================================="
   echo ""
-  
+
   echo "$PUBLIC_URL" > /tmp/artifacts-url.txt
 else
   echo "Warning: Could not extract public URL"
@@ -311,13 +314,14 @@ wait $NODE_PID $TUNNEL_PID
 ```
 
 Make executable:
+
 ```bash
 chmod +x /workspace/artifacts/start-server.sh
 ```
 
 ## Directory Structure
 
-```
+```text
 /workspace/artifacts/
 ├── server.js              # Node.js server
 ├── start-server.sh        # Startup script
@@ -343,6 +347,7 @@ cd /workspace/artifacts
 ```
 
 This will:
+
 1. Start Node.js server on localhost:8080
 2. Create Cloudflare Tunnel with public URL
 3. Print the URL (e.g., `https://random-words-123.trycloudflare.com`)
@@ -353,12 +358,14 @@ This will:
 ### Creating Artifacts
 
 **Folder organization:**
+
 - Create one subfolder per artifact: `$(date +%Y-%m-%d)-description/`
 - Put main file as `index.html` for clean URLs
 - Include images, CSS, JS, data in same folder
 - CDN resources (Tailwind, Three.js, etc.) work fine
 
 **Example:**
+
 ```bash
 mkdir -p /workspace/artifacts/files/$(date +%Y-%m-%d)-dashboard
 cat > /workspace/artifacts/files/$(date +%Y-%m-%d)-dashboard/index.html << 'EOF'
@@ -376,6 +383,7 @@ EOF
 ```
 
 **Access:**
+
 - **IMPORTANT:** Always use full `index.html` path for live reload to work
 - Development (live reload): `https://your-url.trycloudflare.com/2025-12-14-dashboard/index.html?ws=true`
 - Share (static): `https://your-url.trycloudflare.com/2025-12-14-dashboard/index.html`
@@ -385,6 +393,7 @@ EOF
 ### Live Reload
 
 When viewing with `?ws=true`:
+
 1. You'll see a green box at bottom-left: "Live reload connected!"
 2. Edit any file in the artifact folder
 3. Page auto-reloads within 1 second
@@ -395,6 +404,7 @@ When viewing with `?ws=true`:
 ## How It Works
 
 **Architecture:**
+
 - Node.js server (Express) serves static files from `/workspace/artifacts/files/`
 - Chokidar file watcher monitors for changes (including new directories)
 - WebSocket broadcasts reload messages to connected clients
@@ -402,11 +412,13 @@ When viewing with `?ws=true`:
 - Client-side script auto-reloads browser when file changes detected
 
 **Security:**
+
 - Path traversal protection prevents access outside `files/` directory
 - Only files in `/workspace/artifacts/files/` are served
 - Cache-busting headers prevent stale content
 
 **File Watching:**
+
 - Automatically detects new artifact folders created after server start
 - Watches all subdirectories recursively (depth: 99)
 - No server restart needed when creating new projects
@@ -414,25 +426,30 @@ When viewing with `?ws=true`:
 ## Troubleshooting
 
 **502 Bad Gateway:**
+
 - Node server crashed. Check logs: `cat /tmp/server.log`
 - Restart: `cd /workspace/artifacts && node server.js &`
 
 **WebSocket not connecting:**
+
 - Check browser console for errors
 - Ensure `?ws=true` is in URL
 - Red/yellow box at bottom-left shows connection errors
 - Use full `index.html` path, not folder URL
 
 **Files not updating:**
+
 - Check file watcher logs: `tail /tmp/server.log`
 - Ensure files are in `/workspace/artifacts/files/`
 - Should see "File change:" messages in logs
 
 **Port already in use:**
+
 - Kill existing server: `pkill node`
 - Wait 2 seconds, restart
 
 **Browser caching issues:**
+
 - Server sends no-cache headers
 - Hard refresh: Ctrl+Shift+R
 - Add version parameter: `?ws=true&v=2`
@@ -442,7 +459,8 @@ When viewing with `?ws=true`:
 **You:** "Create a Three.js spinning cube demo with Tailwind UI"
 
 **Mom creates:**
-```
+
+```text
 /workspace/artifacts/files/2025-12-14-threejs-cube/
 ├── index.html (Three.js from CDN, Tailwind from CDN)
 └── screenshot.png
@@ -459,17 +477,20 @@ When viewing with `?ws=true`:
 ## Technical Notes
 
 **Why not Node.js fs.watch?**
+
 - `fs.watch` with `recursive: true` only works on macOS/Windows
 - On Linux (Docker), it doesn't support recursive watching
 - Chokidar is the most reliable cross-platform solution
 - We explicitly add new directories when detected to ensure monitoring
 
 **WebSocket vs Server-Sent Events:**
+
 - WebSocket works reliably through Cloudflare Tunnel
 - All connected clients reload when ANY file changes (simple approach)
 - For production, you'd filter by current page path
 
 **Cloudflare Tunnel Free Tier:**
+
 - Random subdomain changes on each restart
 - No persistent URLs without paid account
 - WebSocket support is reliable despite being free tier

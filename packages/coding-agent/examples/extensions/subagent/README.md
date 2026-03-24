@@ -13,7 +13,7 @@ Delegate tasks to specialized subagents with isolated context windows.
 
 ## Structure
 
-```
+```text
 subagent/
 ├── README.md            # This file
 ├── index.ts             # The extension (entry point)
@@ -67,22 +67,26 @@ When running interactively, the tool prompts for confirmation before running pro
 ## Usage
 
 ### Single agent
-```
+
+```text
 Use scout to find all authentication code
 ```
 
 ### Parallel execution
-```
+
+```text
 Run 2 scouts in parallel: one to find models, one to find providers
 ```
 
 ### Chained workflow
-```
+
+```text
 Use a chain: first have scout find the read tool, then have planner suggest improvements
 ```
 
 ### Workflow prompts
-```
+
+```text
 /implement add Redis caching to the session store
 /scout-and-plan refactor auth to support OAuth
 /implement-and-review add input validation to API endpoints
@@ -99,22 +103,26 @@ Use a chain: first have scout find the read tool, then have planner suggest impr
 ## Output Display
 
 **Collapsed view** (default):
+
 - Status icon (✓/✗/⏳) and agent name
 - Last 5-10 items (tool calls and text)
 - Usage stats: `3 turns ↑input ↓output RcacheRead WcacheWrite $cost ctx:contextTokens model`
 
 **Expanded view** (Ctrl+O):
+
 - Full task text
 - All tool calls with formatted arguments
 - Final output rendered as Markdown
 - Per-task usage (for chain/parallel)
 
 **Parallel mode streaming**:
+
 - Shows all tasks with live status (⏳ running, ✓ done, ✗ failed)
 - Updates as each task makes progress
 - Shows "2/3 done, 1 running" status
 
 **Tool call formatting** (mimics built-in tools):
+
 - `$ command` for bash
 - `read ~/path:1-10` for read
 - `grep /pattern/ in ~/path` for grep
@@ -136,6 +144,7 @@ System prompt for the agent goes here.
 ```
 
 **Locations:**
+
 - `~/.pi/agent/agents/*.md` - User-level (always loaded)
 - `.pi/agents/*.md` - Project-level (only with `agentScope: "project"` or `"both"`)
 

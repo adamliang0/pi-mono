@@ -38,7 +38,8 @@ VLLM_USE_DEEP_GEMM=1 vllm serve Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8 \
 ## Performance Metrics
 
 ### Evaluation
-We launched `Qwen3-Coder-480B-A35B-Instruct-FP8` using vLLM and evaluated its performance using  [EvalPlus](https://github.com/evalplus/evalplus). The results are displayed below:
+
+We launched `Qwen3-Coder-480B-A35B-Instruct-FP8` using vLLM and evaluated its performance using [EvalPlus](https://github.com/evalplus/evalplus). The results are displayed below:
 
 | Dataset | Test Type | Pass@1 Score |
 |-----------|-----------|--------------|
@@ -48,6 +49,7 @@ We launched `Qwen3-Coder-480B-A35B-Instruct-FP8` using vLLM and evaluated its pe
 | MBPP+ | Base + extra tests | 0.794 |
 
 ### Benchmarking
+
 We used the following script to benchmark `Qwen/Qwen3-Coder-480B-A35B-Instruct-FP8`
 
 ```bash
@@ -61,6 +63,7 @@ vllm bench serve \
   --max-concurrency 10 \
   --num-prompt 100 \
 ```
+
 If successful, you will see the following output.
 
 ```shell
@@ -88,13 +91,14 @@ P99 ITL (ms):                            69.38
 
 ```
 
-
 ## Using Tips
 
 ### BF16 Models
+
 - **Context Length Limitation**: A single H20 node cannot serve the original context length (262144). You can reduce the `max-model-len` or increase `gpu-memory-utilization` to work within memory constraints.
 
 ### FP8 Models
+
 - **Context Length Limitation**: A single H20 node cannot serve the original context length (262144). You can reduce the `max-model-len` or increase `gpu-memory-utilization` to work within memory constraints.
 - **DeepGEMM Usage**: To use [DeepGEMM](https://github.com/deepseek-ai/DeepGEMM), set `VLLM_USE_DEEP_GEMM=1`. Follow the [setup instructions](https://github.com/vllm-project/vllm/blob/main/benchmarks/kernels/deepgemm/README.md#setup) to install it.
 - **Tensor Parallelism Issue**: When using `tensor-parallel-size 8`, the following failures are expected. Switch to data-parallel mode using `--data-parallel-size`.
@@ -118,12 +122,12 @@ ERROR [multiproc_executor.py:511] ValueError: The output_size of gate's and up's
 ```
 
 ### Tool Calling
+
 - **Enable Tool Calls**: Add `--tool-call-parser qwen3_coder` to enable tool call parsing functionality, please refer to: [tool_calling](https://docs.vllm.ai/en/latest/features/tool_calling.html)
 
 ## Roadmap
 
 - [x] Add benchmark results
-
 
 ## Additional Resources
 

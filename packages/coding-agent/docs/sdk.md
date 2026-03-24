@@ -5,6 +5,7 @@
 The SDK provides programmatic access to pi's agent capabilities. Use it to embed pi in other applications, build custom interfaces, or integrate with automated workflows.
 
 **Example use cases:**
+
 - Build a custom UI (web, desktop, mobile)
 - Integrate agent capabilities into existing applications
 - Create automated pipelines with agent reasoning
@@ -76,49 +77,49 @@ interface AgentSession {
   // Send a prompt and wait for completion
   // If streaming, requires streamingBehavior option to queue the message
   prompt(text: string, options?: PromptOptions): Promise<void>;
-  
+
   // Queue messages during streaming
   steer(text: string): Promise<void>;    // Queue for delivery after the current assistant turn finishes its tool calls
   followUp(text: string): Promise<void>; // Wait: delivered only when agent finishes
-  
+
   // Subscribe to events (returns unsubscribe function)
   subscribe(listener: (event: AgentSessionEvent) => void): () => void;
-  
+
   // Session info
   sessionFile: string | undefined;  // undefined for in-memory
   sessionId: string;
-  
+
   // Model control
   setModel(model: Model): Promise<void>;
   setThinkingLevel(level: ThinkingLevel): void;
   cycleModel(): Promise<ModelCycleResult | undefined>;
   cycleThinkingLevel(): ThinkingLevel | undefined;
-  
+
   // State access
   agent: Agent;
   model: Model | undefined;
   thinkingLevel: ThinkingLevel;
   messages: AgentMessage[];
   isStreaming: boolean;
-  
+
   // Session management
   newSession(options?: { parentSession?: string }): Promise<boolean>;  // Returns false if cancelled by hook
   switchSession(sessionPath: string): Promise<boolean>;
-  
+
   // Forking
   fork(entryId: string): Promise<{ selectedText: string; cancelled: boolean }>;  // Creates new session file
   navigateTree(targetId: string, options?: { summarize?: boolean; customInstructions?: string; replaceInstructions?: boolean; label?: string }): Promise<{ editorText?: string; cancelled: boolean }>;  // In-place navigation
-  
+
   // Hook message injection
   sendHookMessage(message: HookMessage, triggerTurn?: boolean): Promise<void>;
-  
+
   // Compaction
   compact(customInstructions?: string): Promise<CompactionResult>;
   abortCompaction(): void;
-  
+
   // Abort current operation
   abort(): Promise<void>;
-  
+
   // Cleanup
   dispose(): void;
 }
@@ -143,6 +144,7 @@ await session.prompt("After you're done, also check X", { streamingBehavior: "fo
 ```
 
 **Behavior:**
+
 - **Extension commands** (e.g., `/mycommand`): Execute immediately, even during streaming. They manage their own LLM interaction via `pi.sendMessage()`.
 - **File-based prompt templates** (from `.md` files): Expanded to their content before sending/queueing.
 - **During streaming without `streamingBehavior`**: Throws an error. Use `steer()` or `followUp()` directly, or specify the option.
@@ -196,7 +198,7 @@ session.subscribe((event) => {
         // Thinking output (if thinking enabled)
       }
       break;
-    
+
     // Tool execution
     case "tool_execution_start":
       console.log(`Tool: ${event.toolName}`);
@@ -207,7 +209,7 @@ session.subscribe((event) => {
     case "tool_execution_end":
       console.log(`Result: ${event.isError ? "error" : "success"}`);
       break;
-    
+
     // Message lifecycle
     case "message_start":
       // New message starting
@@ -215,7 +217,7 @@ session.subscribe((event) => {
     case "message_end":
       // Message complete
       break;
-    
+
     // Agent lifecycle
     case "agent_start":
       // Agent started processing prompt
@@ -223,7 +225,7 @@ session.subscribe((event) => {
     case "agent_end":
       // Agent finished (event.messages contains new messages)
       break;
-    
+
     // Turn lifecycle (one LLM response + tool calls)
     case "turn_start":
       break;
@@ -231,7 +233,7 @@ session.subscribe((event) => {
       // event.message: assistant response
       // event.toolResults: tool results from this turn
       break;
-    
+
     // Session events (auto-compaction, retry)
     case "auto_compaction_start":
     case "auto_compaction_end":
@@ -250,13 +252,14 @@ session.subscribe((event) => {
 const { session } = await createAgentSession({
   // Working directory for DefaultResourceLoader discovery
   cwd: process.cwd(), // default
-  
+
   // Global config directory
   agentDir: "~/.pi/agent", // default (expands ~)
 });
 ```
 
 `cwd` is used by `DefaultResourceLoader` for:
+
 - Project extensions (`.pi/extensions/`)
 - Project skills:
   - `.pi/skills/`
@@ -266,6 +269,7 @@ const { session } = await createAgentSession({
 - Session directory naming
 
 `agentDir` is used by `DefaultResourceLoader` for:
+
 - Global extensions (`extensions/`)
 - Global skills:
   - `skills/` under `agentDir` (for example `~/.pi/agent/skills/`)
@@ -302,19 +306,20 @@ const available = await modelRegistry.getAvailable();
 const { session } = await createAgentSession({
   model: opus,
   thinkingLevel: "medium", // off, minimal, low, medium, high, xhigh
-  
+
   // Models for cycling (Ctrl+P in interactive mode)
   scopedModels: [
     { model: opus, thinkingLevel: "high" },
     { model: haiku, thinkingLevel: "off" },
   ],
-  
+
   authStorage,
   modelRegistry,
 });
 ```
 
 If no model is provided:
+
 1. Tries to restore from session (if continuing)
 2. Uses default from settings
 3. Falls back to first available model
@@ -324,6 +329,7 @@ If no model is provided:
 ### API Keys and OAuth
 
 API key resolution priority (handled by AuthStorage):
+
 1. Runtime overrides (via `setRuntimeApiKey`, not persisted)
 2. Stored credentials in `auth.json` (API keys or OAuth tokens)
 3. Environment variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, etc.)
@@ -432,10 +438,12 @@ const { session } = await createAgentSession({
 ```
 
 **When you don't need factories:**
+
 - If you omit `tools`, pi automatically creates them with the correct `cwd`
 - If you use `process.cwd()` as your `cwd`, the pre-built instances work fine
 
 **When you must use factories:**
+
 - When you specify both `cwd` (different from `process.cwd()`) AND `tools`
 
 > See [examples/sdk/05-tools.ts](../examples/sdk/05-tools.ts)
@@ -693,12 +701,14 @@ const { session } = await createAgentSession({
 ```
 
 **Static factories:**
+
 - `SettingsManager.create(cwd?, agentDir?)` - Load from files
 - `SettingsManager.inMemory(settings?)` - No file I/O
 
 **Project-specific settings:**
 
 Settings load from two locations and merge:
+
 1. Global: `~/.pi/agent/settings.json`
 2. Project: `<cwd>/.pi/settings.json`
 
@@ -744,10 +754,10 @@ const contextFiles = loader.getAgentsFiles().agentsFiles;
 interface CreateAgentSessionResult {
   // The session
   session: AgentSession;
-  
+
   // Extensions result (for runner setup)
   extensionsResult: LoadExtensionsResult;
-  
+
   // Warning if session model couldn't be restored
   modelFallbackMessage?: string;
 }
@@ -909,12 +919,14 @@ pi --mode rpc --no-session
 See [RPC documentation](rpc.md) for the JSON protocol.
 
 The SDK is preferred when:
+
 - You want type safety
 - You're in the same Node.js process
 - You need direct access to agent state
 - You want to customize tools/extensions programmatically
 
 RPC mode is preferred when:
+
 - You're integrating from another language
 - You want process isolation
 - You're building a language-agnostic client

@@ -87,6 +87,7 @@ Then just talk to pi. By default, pi gives the model four tools: `read`, `write`
 For each built-in provider, pi maintains a list of tool-capable models, updated with every release. Authenticate via subscription (`/login`) or API key, then select any model from that provider via `/model` (or Ctrl+L).
 
 **Subscriptions:**
+
 - Anthropic Claude Pro/Max
 - OpenAI ChatGPT Plus/Pro (Codex)
 - GitHub Copilot
@@ -94,6 +95,7 @@ For each built-in provider, pi maintains a list of tool-capable models, updated 
 - Google Antigravity
 
 **API keys:**
+
 - Anthropic
 - OpenAI
 - Azure OpenAI
@@ -260,6 +262,7 @@ See [docs/settings.md](docs/settings.md) for all options.
 ## Context Files
 
 Pi loads `AGENTS.md` (or `CLAUDE.md`) at startup from:
+
 - `~/.pi/agent/AGENTS.md` (global)
 - Parent directories (walking up from cwd)
 - Current directory
@@ -293,9 +296,11 @@ On-demand capability packages following the [Agent Skills standard](https://agen
 ```markdown
 <!-- ~/.pi/agent/skills/my-skill/SKILL.md -->
 # My Skill
+
 Use this skill when the user asks about X.
 
 ## Steps
+
 1. Do this
 2. Then that
 ```
@@ -317,6 +322,7 @@ export default function (pi: ExtensionAPI) {
 ```
 
 **What's possible:**
+
 - Custom tools (or replace built-in tools entirely)
 - Sub-agents and plan mode
 - Custom compaction and summarization

@@ -3,6 +3,7 @@
 LLMs have limited context windows. When conversations grow too long, pi uses compaction to summarize older content while preserving recent work. This page covers both auto-compaction and branch summarization.
 
 **Source files** ([pi-mono](https://github.com/badlogic/pi-mono)):
+
 - [`packages/coding-agent/src/core/compaction/compaction.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/compaction.ts) - Auto-compaction logic
 - [`packages/coding-agent/src/core/compaction/branch-summarization.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts) - Branch summarization
 - [`packages/coding-agent/src/core/compaction/utils.ts`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/utils.ts) - Shared utilities (file tracking, serialization)
@@ -28,7 +29,7 @@ Both use the same structured summary format and track file operations cumulative
 
 Auto-compaction triggers when:
 
-```
+```text
 contextTokens > contextWindow - reserveTokens
 ```
 
@@ -44,7 +45,7 @@ You can also trigger manually with `/compact [instructions]`, where optional ins
 4. **Append entry**: Save `CompactionEntry` with summary and `firstKeptEntryId`
 5. **Reload**: Session reloads, using summary + messages from `firstKeptEntryId` onwards
 
-```
+```text
 Before compaction:
 
   entry:  0     1     2     3      4     5     6      7      8     9
@@ -82,7 +83,7 @@ A "turn" starts with a user message and includes all assistant responses and too
 
 When a single turn exceeds `keepRecentTokens`, the cut point lands mid-turn at an assistant message. This is a "split turn":
 
-```
+```text
 Split turn (one huge turn exceeds budget):
 
   entry:  0     1     2      3     4      5      6     7      8
@@ -101,12 +102,14 @@ Split turn (one huge turn exceeds budget):
 ```
 
 For split turns, pi generates two summaries and merges them:
+
 1. **History summary**: Previous context (if any)
 2. **Turn prefix summary**: The early part of the split turn
 
 ### Cut Point Rules
 
 Valid cut points are:
+
 - User messages
 - Assistant messages
 - BashExecution messages
@@ -156,7 +159,7 @@ When you use `/tree` to navigate to a different branch, pi offers to summarize t
 4. **Generate summary**: Call LLM with structured format
 5. **Append entry**: Save `BranchSummaryEntry` at navigation point
 
-```
+```text
 Tree before navigation:
 
          ┌─ B ─ C ─ D (old leaf, being abandoned)
@@ -176,6 +179,7 @@ After navigation with summary:
 ### Cumulative File Tracking
 
 Both compaction and branch summarization track files cumulatively. When generating a summary, pi extracts file operations from:
+
 - Tool calls in the messages being summarized
 - Previous compaction or branch summary `details` (if any)
 
@@ -214,28 +218,37 @@ Both compaction and branch summarization use the same structured format:
 
 ```markdown
 ## Goal
+
 [What the user is trying to accomplish]
 
 ## Constraints & Preferences
+
 - [Requirements mentioned by user]
 
 ## Progress
+
 ### Done
+
 - [x] [Completed tasks]
 
 ### In Progress
+
 - [ ] [Current work]
 
 ### Blocked
+
 - [Issues, if any]
 
 ## Key Decisions
+
 - **[Decision]**: [Rationale]
 
 ## Next Steps
+
 1. [What should happen next]
 
 ## Critical Context
+
 - [Data needed to continue]
 
 <read-files>
@@ -252,7 +265,7 @@ path/to/changed.ts
 
 Before summarization, messages are serialized to text via [`serializeConversation()`](https://github.com/badlogic/pi-mono/blob/main/packages/coding-agent/src/core/compaction/utils.ts):
 
-```
+```text
 [User]: What they said
 [Assistant thinking]: Internal reasoning
 [Assistant]: Response text
@@ -311,7 +324,7 @@ import { convertToLlm, serializeConversation } from "@mariozechner/pi-coding-age
 
 pi.on("session_before_compact", async (event, ctx) => {
   const { preparation } = event;
-  
+
   // Convert AgentMessage[] to Message[], then serialize to text
   const conversationText = serializeConversation(
     convertToLlm(preparation.messagesToSummarize)
@@ -325,7 +338,7 @@ pi.on("session_before_compact", async (event, ctx) => {
 
   // Now send to your model for summarization
   const summary = await myModel.summarize(conversationText);
-  
+
   return {
     compaction: {
       summary,

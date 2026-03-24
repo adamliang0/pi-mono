@@ -1,9 +1,11 @@
 ---
 description: Review PRs from URLs with structured issue and code analysis
 ---
+
 You are given one or more GitHub PR URLs: $@
 
 For each PR URL, do the following in order:
+
 1. Add the `inprogress` label to the PR via GitHub CLI before analysis starts. If adding the label fails, report that explicitly and continue.
 2. Read the PR page in full. Include description, all comments, all commits, and all changed files.
 3. Identify any linked issues referenced in the PR body, comments, commit messages, or cross links. Read each issue in full, including all comments.
@@ -23,6 +25,7 @@ For each PR URL, do the following in order:
 Output format per PR:
 PR: <url>
 Changelog:
+
 - ...
 Good:
 - ...

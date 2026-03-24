@@ -54,6 +54,7 @@ The `schedule` field uses standard cron syntax. The `timezone` field uses IANA t
 `minute hour day-of-month month day-of-week`
 
 Examples:
+
 - `0 9 * * *` — daily at 9:00
 - `0 9 * * 1-5` — weekdays at 9:00
 - `30 14 * * 1` — Mondays at 14:30
@@ -63,6 +64,7 @@ Examples:
 ## Timezone Handling
 
 All timestamps must include timezone information:
+
 - For `one-shot`: Use ISO 8601 format with offset (e.g., `2025-12-15T09:00:00+01:00`)
 - For `periodic`: Use the `timezone` field with an IANA timezone name (e.g., `Europe/Vienna`, `America/New_York`)
 
@@ -84,25 +86,30 @@ The harness runs in the host process timezone. When users mention times without 
 The harness watches `workspace/events/` using `fs.watch()` with 100ms debounce.
 
 **New file added:**
+
 - Parse the event
 - Based on type: execute immediately, set `setTimeout`, or set up cron job
 
 **Existing file modified:**
+
 - Cancel any existing timer/cron for this file
 - Re-parse and set up again (allows rescheduling)
 
 **File deleted:**
+
 - Cancel any existing timer/cron for this file
 
 ### Parse Errors
 
 If a JSON file fails to parse:
+
 1. Retry with exponential backoff (100ms, 200ms, 400ms)
 2. If still failing after retries, delete the file and log error to console
 
 ### Execution Errors
 
 If the agent errors while processing an event:
+
 1. Post error message to the channel
 2. Delete the event file (for immediate/one-shot)
 3. No retries
@@ -116,6 +123,7 @@ Events integrate with the existing `ChannelQueue` in `SlackBot`:
 - User @mom mentions retain current behavior: rejected with "Already working" message if agent is busy
 
 When an event triggers:
+
 1. Create a synthetic `SlackEvent` with formatted message
 2. Call `slack.enqueueEvent(event)`
 3. Event waits in queue if agent is busy, processed when idle
@@ -143,6 +151,7 @@ Example: A periodic event checks for new emails every 15 minutes. If there are n
 ## File Naming
 
 Event files should have descriptive names ending in `.json`:
+
 - `webhook-12345.json` (immediate)
 - `dentist-reminder-2025-12-15.json` (one-shot)
 - `daily-inbox-summary.json` (periodic)
@@ -190,7 +199,7 @@ class EventsWatcher {
   private timers: Map<string, NodeJS.Timeout> = new Map();
   private crons: Map<string, Cron> = new Map();
   private startTime: number;
-  
+
   constructor(
     private eventsDir: string,
     private slack: SlackBot,
@@ -198,10 +207,10 @@ class EventsWatcher {
   ) {
     this.startTime = Date.now();
   }
-  
+
   start(): void { /* scan existing, setup fs.watch */ }
   stop(): void { /* cancel all timers/crons, stop watching */ }
-  
+
   private handleFile(filename: string): void { /* parse, schedule */ }
   private handleDelete(filename: string): void { /* cancel timer/cron */ }
   private execute(filename: string, event: MomEvent): void { /* enqueue */ }
@@ -224,16 +233,20 @@ You can schedule events that wake you up at specific times or when external thin
 ### Event Types
 
 **Immediate** — Triggers as soon as harness sees the file. Use in scripts/webhooks to signal external events.
+
 ```json
 {"type": "immediate", "channelId": "C123", "text": "New GitHub issue opened"}
 ```
+```
 
 **One-shot** — Triggers once at a specific time. Use for reminders.
+
 ```json
 {"type": "one-shot", "channelId": "C123", "text": "Remind Mario about dentist", "at": "2025-12-15T09:00:00+01:00"}
 ```
 
 **Periodic** — Triggers on a cron schedule. Use for recurring tasks.
+
 ```json
 {"type": "periodic", "channelId": "C123", "text": "Check inbox and summarize", "schedule": "0 9 * * 1-5", "timezone": "Europe/Vienna"}
 ```
@@ -268,7 +281,8 @@ EOF
 ### When Events Trigger
 
 You receive a message like:
-```
+
+```text
 [EVENT:dentist-reminder.json:one-shot:2025-12-14T09:00:00+01:00] Dentist tomorrow
 ```
 
@@ -283,12 +297,14 @@ When writing programs that create immediate events (email watchers, webhook hand
 - Or just signal "new activity, check inbox" rather than per-item events
 
 Bad:
+
 ```bash
 # Creates event per email — will flood the queue
 on_email() { echo '{"type":"immediate"...}' > /workspace/events/email-$ID.json; }
 ```
 
 Good:
+
 ```bash
 # Debounce: flag file + single delayed event  
 on_email() {
@@ -304,4 +320,5 @@ Or simpler: use a periodic event to check for new emails every 15 minutes instea
 ### Limits
 
 Maximum 5 events can be queued. Don't create excessive immediate or periodic events.
-```
+
+```text

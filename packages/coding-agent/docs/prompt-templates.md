@@ -22,7 +22,9 @@ Disable discovery with `--no-prompt-templates`.
 ---
 description: Review staged git changes
 ---
+
 Review the staged changes (`git diff --cached`). Focus on:
+
 - Bugs and logic errors
 - Security issues
 - Error handling gaps
@@ -35,7 +37,7 @@ Review the staged changes (`git diff --cached`). Focus on:
 
 Type `/` followed by the template name in the editor. Autocomplete shows available templates with descriptions.
 
-```
+```text
 /review                           # Expands review.md
 /component Button                 # Expands with argument
 /component Button "click handler" # Multiple arguments
@@ -56,6 +58,7 @@ Example:
 ---
 description: Create a component
 ---
+
 Create a React component named $1 with features: $@
 ```
 

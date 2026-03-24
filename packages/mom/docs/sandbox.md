@@ -7,6 +7,7 @@ Mom can run tools either directly on the host or inside a Docker container for i
 ## Why Docker?
 
 When mom runs on your machine and is accessible via Slack, anyone in your workspace could potentially:
+
 - Execute arbitrary commands on your machine
 - Access your files, credentials, etc.
 - Cause damage via prompt injection
@@ -26,7 +27,7 @@ mom --sandbox=docker:mom-sandbox ./data
 
 ## How It Works
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │  Host                                               │
 │                                                     │
@@ -81,7 +82,7 @@ When mom needs a tool, she installs it. When she needs credentials, she asks you
 
 ### Example Flow
 
-```
+```text
 User: "@mom check the spine-runtimes repo"
 Mom:  "I need gh CLI. Installing..."
       (runs: apk add github-cli)
@@ -94,6 +95,7 @@ Mom:  "Done. Checking repo..."
 ## Persistence
 
 The container persists across:
+
 - `docker stop` / `docker start`
 - Host reboots
 
@@ -117,17 +119,20 @@ mom --sandbox=host ./data
 ## Security Considerations
 
 **What the container CAN do:**
+
 - Read/write files in `/workspace` (your data dir)
 - Make network requests (for git, gh, curl, etc.)
 - Install packages
 - Run any commands
 
 **What the container CANNOT do:**
+
 - Access files outside `/workspace`
 - Access your host's credentials
 - Affect your host system
 
 **For maximum security:**
+
 1. Create a dedicated GitHub bot account with limited repo access
 2. Only share that bot's token with mom
 3. Don't mount sensitive directories
@@ -135,19 +140,23 @@ mom --sandbox=host ./data
 ## Troubleshooting
 
 ### Container not running
+
 ```bash
 ./docker.sh status  # Check status
 ./docker.sh start   # Start it
 ```
 
 ### Reset container
+
 ```bash
 ./docker.sh remove
 ./docker.sh create ./data
 ```
 
 ### Missing tools
+
 Ask mom to install them, or manually:
+
 ```bash
 docker exec mom-sandbox apk add <package>
 ```

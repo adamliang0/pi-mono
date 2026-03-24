@@ -34,6 +34,7 @@ Pi loads skills from:
 - CLI: `--skill <path>` (repeatable, additive even with `--no-skills`)
 
 Discovery rules:
+
 - Direct `.md` files in the skills directory root
 - Recursive `SKILL.md` files under subdirectories
 
@@ -92,7 +93,7 @@ Toggle skill commands via `/settings` in interactive mode or in `settings.json`:
 
 A skill is a directory with a `SKILL.md` file. Everything else is freeform.
 
-```
+```text
 my-skill/
 ├── SKILL.md              # Required: frontmatter + instructions
 ├── scripts/              # Helper scripts
@@ -163,11 +164,13 @@ Invalid: `PDF-Processing`, `-pdf`, `pdf--processing`
 The description determines when the agent loads the skill. Be specific.
 
 Good:
+
 ```yaml
 description: Extracts text and tables from PDF files, fills PDF forms, and merges multiple PDFs. Use when working with PDF documents.
 ```
 
 Poor:
+
 ```yaml
 description: Helps with PDFs.
 ```
@@ -189,7 +192,7 @@ Name collisions (same name from different locations) warn and keep the first ski
 
 ## Example
 
-```
+```text
 brave-search/
 ├── SKILL.md
 ├── search.js
@@ -197,6 +200,7 @@ brave-search/
 ```
 
 **SKILL.md:**
+
 ```markdown
 ---
 name: brave-search
@@ -214,14 +218,14 @@ cd /path/to/brave-search && npm install
 ## Search
 
 \`\`\`bash
-./search.js "query"              # Basic search
+./search.js "query" # Basic search
 ./search.js "query" --content    # Include page content
 \`\`\`
 
 ## Extract Page Content
 
 \`\`\`bash
-./content.js https://example.com
+./content.js <https://example.com>
 \`\`\`
 ```
 

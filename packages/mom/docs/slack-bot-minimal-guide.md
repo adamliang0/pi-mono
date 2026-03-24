@@ -11,6 +11,7 @@ npm install @slack/socket-mode @slack/web-api
 ```
 
 That's it. Two packages:
+
 - `@slack/socket-mode` - Receives events via WebSocket
 - `@slack/web-api` - Sends messages back to Slack
 
@@ -21,11 +22,13 @@ That's it. Two packages:
 You need **TWO tokens**:
 
 ### A. Bot Token (`xoxb-...`)
-1. Go to https://api.slack.com/apps
+
+1. Go to <https://api.slack.com/apps>
 2. Create app → "From scratch"
 3. Click "OAuth & Permissions" in sidebar
 4. Add **Bot Token Scopes** (all 16):
-   ```
+
+   ```text
    app_mentions:read
    channels:history
    channels:join
@@ -43,10 +46,12 @@ You need **TWO tokens**:
    mpim:write
    users:read
    ```
+
 5. Click "Install to Workspace" at top
 6. Copy the **Bot User OAuth Token** (starts with `xoxb-`)
 
 ### B. App-Level Token (`xapp-...`)
+
 1. In same app, click "Basic Information" in sidebar
 2. Scroll to "App-Level Tokens"
 3. Click "Generate Token and Scopes"
@@ -59,7 +64,7 @@ You need **TWO tokens**:
 
 ## 3. Enable Socket Mode
 
-1. Go to https://api.slack.com/apps → select your app
+1. Go to <https://api.slack.com/apps> → select your app
 2. Click **"Socket Mode"** in sidebar
 3. Toggle **"Enable Socket Mode"** to ON
 4. This routes your app's interactions and events over WebSockets instead of public HTTP endpoints
@@ -71,7 +76,7 @@ You need **TWO tokens**:
 
 ## 4. Enable Direct Messages
 
-1. Go to https://api.slack.com/apps → select your app
+1. Go to <https://api.slack.com/apps> → select your app
 2. Click **"App Home"** in sidebar
 3. Scroll to **"Show Tabs"** section
 4. Check **"Allow users to send Slash commands and messages from the messages tab"**
@@ -81,7 +86,7 @@ You need **TWO tokens**:
 
 ## 5. Subscribe to Events
 
-1. Go to https://api.slack.com/apps → select your app
+1. Go to <https://api.slack.com/apps> → select your app
 2. Click **"Event Subscriptions"** in sidebar
 3. Toggle **"Enable Events"** to ON
 4. **Important:** No Request URL needed (Socket Mode handles this)
@@ -130,14 +135,14 @@ socketClient.on('app_mention', async ({ event, ack }) => {
   try {
     // Acknowledge receipt
     await ack();
-    
+
     console.log('Mentioned:', event.text);
     console.log('Channel:', event.channel);
     console.log('User:', event.user);
-    
+
     // Process with your agent
     const response = await yourAgentFunction(event.text);
-    
+
     // Send response
     await webClient.chat.postMessage({
       channel: event.channel,
@@ -177,16 +182,16 @@ If you want to see every message in channels/DMs the bot is in:
 // Listen to all Slack events
 socketClient.on('slack_event', async ({ event, body, ack }) => {
   await ack();
-  
+
   console.log('Event type:', event.type);
   console.log('Event data:', event);
-  
+
   if (event.type === 'message' && event.subtype === undefined) {
     // Regular message (not bot message, not edited, etc.)
     console.log('Message:', event.text);
     console.log('Channel:', event.channel);
     console.log('User:', event.user);
-    
+
     // Your logic here
   }
 });
@@ -197,6 +202,7 @@ socketClient.on('slack_event', async ({ event, body, ack }) => {
 ## 9. Common Operations
 
 ### Send a message
+
 ```javascript
 await webClient.chat.postMessage({
   channel: 'C12345', // or channel ID from event
@@ -205,6 +211,7 @@ await webClient.chat.postMessage({
 ```
 
 ### Send a DM
+
 ```javascript
 // Open DM channel with user
 const result = await webClient.conversations.open({
@@ -219,6 +226,7 @@ await webClient.chat.postMessage({
 ```
 
 ### List channels
+
 ```javascript
 const channels = await webClient.conversations.list({
   types: 'public_channel,private_channel'
@@ -227,6 +235,7 @@ console.log(channels.channels);
 ```
 
 ### Get channel members
+
 ```javascript
 const members = await webClient.conversations.members({
   channel: 'C12345'
@@ -235,6 +244,7 @@ console.log(members.members); // Array of user IDs
 ```
 
 ### Get user info
+
 ```javascript
 const user = await webClient.users.info({
   user: 'U12345'
@@ -244,6 +254,7 @@ console.log(user.user.real_name);
 ```
 
 ### Join a channel
+
 ```javascript
 await webClient.conversations.join({
   channel: 'C12345'
@@ -251,6 +262,7 @@ await webClient.conversations.join({
 ```
 
 ### Upload a file
+
 ```javascript
 await webClient.files.uploadV2({
   channel_id: 'C12345',
@@ -289,17 +301,17 @@ const agent = new MyAgent();
 // Handle mentions
 socketClient.on('app_mention', async ({ event, ack }) => {
   await ack();
-  
+
   try {
     // Remove the @mention from text
     const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
-    
+
     // Process with your agent
     const response = await agent.process(text, {
       user: event.user,
       channel: event.channel
     });
-    
+
     // Send response
     await webClient.chat.postMessage({
       channel: event.channel,
@@ -307,7 +319,7 @@ socketClient.on('app_mention', async ({ event, ack }) => {
     });
   } catch (error) {
     console.error('Error processing mention:', error);
-    
+
     // Send error message
     await webClient.chat.postMessage({
       channel: event.channel,
@@ -377,19 +389,23 @@ Event object structure:
 ## Troubleshooting
 
 ### "invalid_auth" error
+
 - Check you're using the right tokens
 - Bot token for WebClient, App token for SocketModeClient
 
 ### "missing_scope" error
+
 - Make sure you added all 16 bot scopes
 - Reinstall the app after adding scopes
 
 ### Not receiving events
+
 - Check Socket Mode is enabled
 - Check you subscribed to events in "Event Subscriptions"
 - Make sure bot is in the channel (or use `channels:join`)
 
 ### Bot doesn't respond to mentions
+
 - Must subscribe to `app_mention` event
 - Bot must be installed to workspace
 - Check `await ack()` is called

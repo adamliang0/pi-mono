@@ -1,10 +1,10 @@
 # Kimi-K2 Deployment Guide
 
 > [!Note]
-> This guide only provides some examples of deployment commands for Kimi-K2, which may not be the optimal configuration. Since inference engines are still being updated frequently,  please continue to follow the guidance from their homepage if you want to achieve better inference performance.
-
+> This guide only provides some examples of deployment commands for Kimi-K2, which may not be the optimal configuration. Since inference engines are still being updated frequently, please continue to follow the guidance from their homepage if you want to achieve better inference performance.
 
 ## vLLM Deployment
+
 vLLM version v0.10.0rc1 or later is required.
 
 The smallest deployment unit for Kimi-K2 FP8 weights with 128k seqlen on mainstream H200 or H20 platform is a cluster with 16 GPUs with either Tensor Parallel (TP) or "data parallel + expert parallel" (DP+EP).
@@ -28,6 +28,7 @@ vllm serve $MODEL_PATH \
 ```
 
 **Key parameter notes:**
+
 - `--tensor-parallel-size 16`: If using more than 16 GPUs, combine with pipeline-parallelism.
 - `--enable-auto-tool-choice`: Required when enabling tool usage.
 - `--tool-call-parser kimi_k2`: Required when enabling tool usage.
@@ -48,7 +49,6 @@ vllm serve $MODEL_PATH --headless --data-parallel-start-rank 8 --port 8000 --ser
 
 Similarly, we can use TP or DP+EP in SGLang for Deployment, here are the examples.
 
-
 ### Tensor Parallelism
 
 Here is the simple example code to run TP16 with two nodes on H200:
@@ -62,6 +62,7 @@ python -m sglang.launch_server --model-path $MODEL_PATH --tp 16 --dist-init-addr
 ```
 
 **Key parameter notes:**
+
 - `--tool-call-parser kimi_k2`: Required when enabling tool usage.
 
 ### Data Parallelism + Expert Parallelism
@@ -86,6 +87,7 @@ PYTHONUNBUFFERED=1 python -m sglang.srt.disaggregation.launch_lb --prefill http:
 ## KTransformers Deployment
 
 Please copy all configuration files (i.e., everything except the .safetensors files) into the GGUF checkpoint folder at /path/to/K2. Then run:
+
 ``` bash
 python ktransformers/server/main.py  --model_path /path/to/K2 --gguf_path /path/to/K2 --cache_lens 30000
 ```
@@ -97,17 +99,23 @@ python ktransformers/server/main.py  --model_path /path/to/K2 --gguf_path /path/
 ```
 
 ## TensorRT-LLM Deployment
+
 ### Prerequisite
+
 Please refer to [this guide](https://nvidia.github.io/TensorRT-LLM/installation/build-from-source-linux.html) to build TensorRT-LLM v1.0.0-rc2 from source and start a TRT-LLM docker container.
 
 install blobfile by:
+
 ```bash
 pip install blobfile
 ```
+
 ### Multi-node Serving
+
 TensorRT-LLM supports multi-node inference. You can use mpirun to launch Kimi-K2 with multi-node jobs. We will use two nodes for this example.
 
 #### mpirun
+
 mpirun requires each node to have passwordless ssh access to the other node. We need to setup the environment inside the docker container. Run the container with host network and mount the current directory as well as model directory to the container.
 
 ```bash
@@ -151,6 +159,7 @@ systemctl restart ssh
 ```
 
 Generate additional config for trtllm serve.
+
 ```bash
 cat >/path/to/TensorRT-LLM/extra-llm-api-config.yml <<EOF
 cuda_graph_config:
@@ -168,7 +177,6 @@ print_iter_log: true
 enable_attention_dp: true
 EOF
 ```
-
 
 After the preparations,you can run the trtllm-serve on two nodes using mpirun:
 
