@@ -3,249 +3,299 @@ import type { ResponseCreateParamsStreaming } from "openai/resources/responses/r
 import { getEnvApiKey } from "../env-api-keys.js";
 import { supportsXhigh } from "../models.js";
 import type {
-	Api,
-	AssistantMessage,
-	CacheRetention,
-	Context,
-	Model,
-	SimpleStreamOptions,
-	StreamFunction,
-	StreamOptions,
-	Usage,
+  Api,
+  AssistantMessage,
+  CacheRetention,
+  Context,
+  Model,
+  SimpleStreamOptions,
+  StreamFunction,
+  StreamOptions,
+  Usage,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
-import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copilot-headers.js";
-import { convertResponsesMessages, convertResponsesTools, processResponsesStream } from "./openai-responses-shared.js";
+import {
+  buildCopilotDynamicHeaders,
+  hasCopilotVisionInput,
+} from "./github-copilot-headers.js";
+import {
+  convertResponsesMessages,
+  convertResponsesTools,
+  processResponsesStream,
+} from "./openai-responses-shared.js";
 import { buildBaseOptions, clampReasoning } from "./simple-options.js";
 
-const OPENAI_TOOL_CALL_PROVIDERS = new Set(["openai", "openai-codex", "opencode"]);
+const OPENAI_TOOL_CALL_PROVIDERS = new Set([
+  "openai",
+  "openai-codex",
+  "opencode",
+]);
 
 /**
  * Resolve cache retention preference.
  * Defaults to "short" and uses PI_CACHE_RETENTION for backward compatibility.
  */
-function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention {
-	if (cacheRetention) {
-		return cacheRetention;
-	}
-	if (typeof process !== "undefined" && process.env.PI_CACHE_RETENTION === "long") {
-		return "long";
-	}
-	return "short";
+function resolveCacheRetention(
+  cacheRetention?: CacheRetention,
+): CacheRetention {
+  if (cacheRetention) {
+    return cacheRetention;
+  }
+  if (
+    typeof process !== "undefined" &&
+    process.env.PI_CACHE_RETENTION === "long"
+  ) {
+    return "long";
+  }
+  return "short";
 }
 
 /**
  * Get prompt cache retention based on cacheRetention and base URL.
  * Only applies to direct OpenAI API calls (api.openai.com).
  */
-function getPromptCacheRetention(baseUrl: string, cacheRetention: CacheRetention): "24h" | undefined {
-	if (cacheRetention !== "long") {
-		return undefined;
-	}
-	if (baseUrl.includes("api.openai.com")) {
-		return "24h";
-	}
-	return undefined;
+function getPromptCacheRetention(
+  baseUrl: string,
+  cacheRetention: CacheRetention,
+): "24h" | undefined {
+  if (cacheRetention !== "long") {
+    return undefined;
+  }
+  if (baseUrl.includes("api.openai.com")) {
+    return "24h";
+  }
+  return undefined;
 }
 
 // OpenAI Responses-specific options
 export interface OpenAIResponsesOptions extends StreamOptions {
-	reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh";
-	reasoningSummary?: "auto" | "detailed" | "concise" | null;
-	serviceTier?: ResponseCreateParamsStreaming["service_tier"];
+  reasoningEffort?: "minimal" | "low" | "medium" | "high" | "xhigh";
+  reasoningSummary?: "auto" | "detailed" | "concise" | null;
+  serviceTier?: ResponseCreateParamsStreaming["service_tier"];
 }
 
 /**
  * Generate function for OpenAI Responses API
  */
-export const streamOpenAIResponses: StreamFunction<"openai-responses", OpenAIResponsesOptions> = (
-	model: Model<"openai-responses">,
-	context: Context,
-	options?: OpenAIResponsesOptions,
+export const streamOpenAIResponses: StreamFunction<
+  "openai-responses",
+  OpenAIResponsesOptions
+> = (
+  model: Model<"openai-responses">,
+  context: Context,
+  options?: OpenAIResponsesOptions,
 ): AssistantMessageEventStream => {
-	const stream = new AssistantMessageEventStream();
+  const stream = new AssistantMessageEventStream();
 
-	// Start async processing
-	(async () => {
-		const output: AssistantMessage = {
-			role: "assistant",
-			content: [],
-			api: model.api as Api,
-			provider: model.provider,
-			model: model.id,
-			usage: {
-				input: 0,
-				output: 0,
-				cacheRead: 0,
-				cacheWrite: 0,
-				totalTokens: 0,
-				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-			},
-			stopReason: "stop",
-			timestamp: Date.now(),
-		};
+  // Start async processing
+  (async () => {
+    const output: AssistantMessage = {
+      role: "assistant",
+      content: [],
+      api: model.api as Api,
+      provider: model.provider,
+      model: model.id,
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "stop",
+      timestamp: Date.now(),
+    };
 
-		try {
-			// Create OpenAI client
-			const apiKey = options?.apiKey || getEnvApiKey(model.provider) || "";
-			const client = createClient(model, context, apiKey, options?.headers);
-			let params = buildParams(model, context, options);
-			const nextParams = await options?.onPayload?.(params, model);
-			if (nextParams !== undefined) {
-				params = nextParams as ResponseCreateParamsStreaming;
-			}
-			const openaiStream = await client.responses.create(
-				params,
-				options?.signal ? { signal: options.signal } : undefined,
-			);
-			stream.push({ type: "start", partial: output });
+    try {
+      // Create OpenAI client
+      const apiKey = options?.apiKey || getEnvApiKey(model.provider) || "";
+      const client = createClient(model, context, apiKey, options?.headers);
+      let params = buildParams(model, context, options);
+      const nextParams = await options?.onPayload?.(params, model);
+      if (nextParams !== undefined) {
+        params = nextParams as ResponseCreateParamsStreaming;
+      }
+      const openaiStream = await client.responses.create(
+        params,
+        options?.signal ? { signal: options.signal } : undefined,
+      );
+      stream.push({ type: "start", partial: output });
 
-			await processResponsesStream(openaiStream, output, stream, model, {
-				serviceTier: options?.serviceTier,
-				applyServiceTierPricing,
-			});
+      await processResponsesStream(openaiStream, output, stream, model, {
+        serviceTier: options?.serviceTier,
+        applyServiceTierPricing,
+      });
 
-			if (options?.signal?.aborted) {
-				throw new Error("Request was aborted");
-			}
+      if (options?.signal?.aborted) {
+        throw new Error("Request was aborted");
+      }
 
-			if (output.stopReason === "aborted" || output.stopReason === "error") {
-				throw new Error("An unknown error occurred");
-			}
+      if (output.stopReason === "aborted" || output.stopReason === "error") {
+        throw new Error("An unknown error occurred");
+      }
 
-			stream.push({ type: "done", reason: output.stopReason, message: output });
-			stream.end();
-		} catch (error) {
-			for (const block of output.content) delete (block as { index?: number }).index;
-			output.stopReason = options?.signal?.aborted ? "aborted" : "error";
-			output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
-			stream.push({ type: "error", reason: output.stopReason, error: output });
-			stream.end();
-		}
-	})();
+      stream.push({ type: "done", reason: output.stopReason, message: output });
+      stream.end();
+    } catch (error) {
+      for (const block of output.content)
+        delete (block as { index?: number }).index;
+      output.stopReason = options?.signal?.aborted ? "aborted" : "error";
+      output.errorMessage =
+        error instanceof Error ? error.message : JSON.stringify(error);
+      stream.push({ type: "error", reason: output.stopReason, error: output });
+      stream.end();
+    }
+  })();
 
-	return stream;
+  return stream;
 };
 
-export const streamSimpleOpenAIResponses: StreamFunction<"openai-responses", SimpleStreamOptions> = (
-	model: Model<"openai-responses">,
-	context: Context,
-	options?: SimpleStreamOptions,
+export const streamSimpleOpenAIResponses: StreamFunction<
+  "openai-responses",
+  SimpleStreamOptions
+> = (
+  model: Model<"openai-responses">,
+  context: Context,
+  options?: SimpleStreamOptions,
 ): AssistantMessageEventStream => {
-	const apiKey = options?.apiKey || getEnvApiKey(model.provider);
-	if (!apiKey) {
-		throw new Error(`No API key for provider: ${model.provider}`);
-	}
+  const apiKey = options?.apiKey || getEnvApiKey(model.provider);
+  if (!apiKey) {
+    throw new Error(`No API key for provider: ${model.provider}`);
+  }
 
-	const base = buildBaseOptions(model, options, apiKey);
-	const reasoningEffort = supportsXhigh(model) ? options?.reasoning : clampReasoning(options?.reasoning);
+  const base = buildBaseOptions(model, options, apiKey);
+  const reasoningEffort = supportsXhigh(model)
+    ? options?.reasoning
+    : clampReasoning(options?.reasoning);
 
-	return streamOpenAIResponses(model, context, {
-		...base,
-		reasoningEffort,
-	} satisfies OpenAIResponsesOptions);
+  return streamOpenAIResponses(model, context, {
+    ...base,
+    reasoningEffort,
+  } satisfies OpenAIResponsesOptions);
 };
 
 function createClient(
-	model: Model<"openai-responses">,
-	context: Context,
-	apiKey?: string,
-	optionsHeaders?: Record<string, string>,
+  model: Model<"openai-responses">,
+  context: Context,
+  apiKey?: string,
+  optionsHeaders?: Record<string, string>,
 ) {
-	if (!apiKey) {
-		if (!process.env.OPENAI_API_KEY) {
-			throw new Error(
-				"OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it as an argument.",
-			);
-		}
-		apiKey = process.env.OPENAI_API_KEY;
-	}
+  if (!apiKey) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error(
+        "OpenAI API key is required. Set OPENAI_API_KEY environment variable or pass it as an argument.",
+      );
+    }
+    apiKey = process.env.OPENAI_API_KEY;
+  }
 
-	const headers = { ...model.headers };
-	if (model.provider === "github-copilot") {
-		const hasImages = hasCopilotVisionInput(context.messages);
-		const copilotHeaders = buildCopilotDynamicHeaders({
-			messages: context.messages,
-			hasImages,
-		});
-		Object.assign(headers, copilotHeaders);
-	}
+  const headers = { ...model.headers };
+  if (model.provider === "github-copilot") {
+    const hasImages = hasCopilotVisionInput(context.messages);
+    const copilotHeaders = buildCopilotDynamicHeaders({
+      messages: context.messages,
+      hasImages,
+    });
+    Object.assign(headers, copilotHeaders);
+  }
 
-	// Merge options headers last so they can override defaults
-	if (optionsHeaders) {
-		Object.assign(headers, optionsHeaders);
-	}
+  // Merge options headers last so they can override defaults
+  if (optionsHeaders) {
+    Object.assign(headers, optionsHeaders);
+  }
 
-	return new OpenAI({
-		apiKey,
-		baseURL: model.baseUrl,
-		dangerouslyAllowBrowser: true,
-		defaultHeaders: headers,
-	});
+  return new OpenAI({
+    apiKey,
+    baseURL: model.baseUrl,
+    dangerouslyAllowBrowser: true,
+    defaultHeaders: headers,
+  });
 }
 
-function buildParams(model: Model<"openai-responses">, context: Context, options?: OpenAIResponsesOptions) {
-	const messages = convertResponsesMessages(model, context, OPENAI_TOOL_CALL_PROVIDERS);
+function buildParams(
+  model: Model<"openai-responses">,
+  context: Context,
+  options?: OpenAIResponsesOptions,
+) {
+  const messages = convertResponsesMessages(
+    model,
+    context,
+    OPENAI_TOOL_CALL_PROVIDERS,
+  );
 
-	const cacheRetention = resolveCacheRetention(options?.cacheRetention);
-	const params: ResponseCreateParamsStreaming = {
-		model: model.id,
-		input: messages,
-		stream: true,
-		prompt_cache_key: cacheRetention === "none" ? undefined : options?.sessionId,
-		prompt_cache_retention: getPromptCacheRetention(model.baseUrl, cacheRetention),
-		store: false,
-	};
+  const cacheRetention = resolveCacheRetention(options?.cacheRetention);
+  const params: ResponseCreateParamsStreaming = {
+    model: model.id,
+    input: messages,
+    stream: true,
+    prompt_cache_key:
+      cacheRetention === "none" ? undefined : options?.sessionId,
+    prompt_cache_retention: getPromptCacheRetention(
+      model.baseUrl,
+      cacheRetention,
+    ),
+    store: false,
+  };
 
-	if (options?.maxTokens) {
-		params.max_output_tokens = options?.maxTokens;
-	}
+  if (options?.maxTokens) {
+    params.max_output_tokens = options?.maxTokens;
+  }
 
-	if (options?.temperature !== undefined) {
-		params.temperature = options?.temperature;
-	}
+  if (options?.temperature !== undefined) {
+    params.temperature = options?.temperature;
+  }
 
-	if (options?.serviceTier !== undefined) {
-		params.service_tier = options.serviceTier;
-	}
+  if (options?.serviceTier !== undefined) {
+    params.service_tier = options.serviceTier;
+  }
 
-	if (context.tools) {
-		params.tools = convertResponsesTools(context.tools);
-	}
+  if (context.tools) {
+    params.tools = convertResponsesTools(context.tools);
+  }
 
-	if (model.reasoning) {
-		if (options?.reasoningEffort || options?.reasoningSummary) {
-			params.reasoning = {
-				effort: options?.reasoningEffort || "medium",
-				summary: options?.reasoningSummary || "auto",
-			};
-			params.include = ["reasoning.encrypted_content"];
-		} else if (model.provider !== "github-copilot") {
-			params.reasoning = { effort: "none" };
-		}
-	}
+  if (model.reasoning) {
+    if (options?.reasoningEffort || options?.reasoningSummary) {
+      params.reasoning = {
+        effort: options?.reasoningEffort || "medium",
+        summary: options?.reasoningSummary || "auto",
+      };
+      params.include = ["reasoning.encrypted_content"];
+    } else if (model.provider !== "github-copilot") {
+      params.reasoning = { effort: "none" };
+    }
+  }
 
-	return params;
+  return params;
 }
 
-function getServiceTierCostMultiplier(serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined): number {
-	switch (serviceTier) {
-		case "flex":
-			return 0.5;
-		case "priority":
-			return 2;
-		default:
-			return 1;
-	}
+function getServiceTierCostMultiplier(
+  serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
+): number {
+  switch (serviceTier) {
+    case "flex":
+      return 0.5;
+    case "priority":
+      return 2;
+    default:
+      return 1;
+  }
 }
 
-function applyServiceTierPricing(usage: Usage, serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined) {
-	const multiplier = getServiceTierCostMultiplier(serviceTier);
-	if (multiplier === 1) return;
+function applyServiceTierPricing(
+  usage: Usage,
+  serviceTier: ResponseCreateParamsStreaming["service_tier"] | undefined,
+) {
+  const multiplier = getServiceTierCostMultiplier(serviceTier);
+  if (multiplier === 1) return;
 
-	usage.cost.input *= multiplier;
-	usage.cost.output *= multiplier;
-	usage.cost.cacheRead *= multiplier;
-	usage.cost.cacheWrite *= multiplier;
-	usage.cost.total = usage.cost.input + usage.cost.output + usage.cost.cacheRead + usage.cost.cacheWrite;
+  usage.cost.input *= multiplier;
+  usage.cost.output *= multiplier;
+  usage.cost.cacheRead *= multiplier;
+  usage.cost.cacheWrite *= multiplier;
+  usage.cost.total =
+    usage.cost.input +
+    usage.cost.output +
+    usage.cost.cacheRead +
+    usage.cost.cacheWrite;
 }

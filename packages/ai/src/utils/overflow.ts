@@ -25,23 +25,23 @@ import type { AssistantMessage } from "../types.js";
  * - Ollama: Silently truncates input - not detectable via error message
  */
 const OVERFLOW_PATTERNS = [
-	/prompt is too long/i, // Anthropic
-	/input is too long for requested model/i, // Amazon Bedrock
-	/exceeds the context window/i, // OpenAI (Completions & Responses API)
-	/input token count.*exceeds the maximum/i, // Google (Gemini)
-	/maximum prompt length is \d+/i, // xAI (Grok)
-	/reduce the length of the messages/i, // Groq
-	/maximum context length is \d+ tokens/i, // OpenRouter (all backends)
-	/exceeds the limit of \d+/i, // GitHub Copilot
-	/exceeds the available context size/i, // llama.cpp server
-	/greater than the context length/i, // LM Studio
-	/context window exceeds limit/i, // MiniMax
-	/exceeded model token limit/i, // Kimi For Coding
-	/too large for model with \d+ maximum context length/i, // Mistral
-	/model_context_window_exceeded/i, // z.ai non-standard finish_reason surfaced as error text
-	/context[_ ]length[_ ]exceeded/i, // Generic fallback
-	/too many tokens/i, // Generic fallback
-	/token limit exceeded/i, // Generic fallback
+  /prompt is too long/i, // Anthropic
+  /input is too long for requested model/i, // Amazon Bedrock
+  /exceeds the context window/i, // OpenAI (Completions & Responses API)
+  /input token count.*exceeds the maximum/i, // Google (Gemini)
+  /maximum prompt length is \d+/i, // xAI (Grok)
+  /reduce the length of the messages/i, // Groq
+  /maximum context length is \d+ tokens/i, // OpenRouter (all backends)
+  /exceeds the limit of \d+/i, // GitHub Copilot
+  /exceeds the available context size/i, // llama.cpp server
+  /greater than the context length/i, // LM Studio
+  /context window exceeds limit/i, // MiniMax
+  /exceeded model token limit/i, // Kimi For Coding
+  /too large for model with \d+ maximum context length/i, // Mistral
+  /model_context_window_exceeded/i, // z.ai non-standard finish_reason surfaced as error text
+  /context[_ ]length[_ ]exceeded/i, // Generic fallback
+  /too many tokens/i, // Generic fallback
+  /token limit exceeded/i, // Generic fallback
 ];
 
 /**
@@ -89,35 +89,40 @@ const OVERFLOW_PATTERNS = [
  * @param contextWindow - Optional context window size for detecting silent overflow (z.ai)
  * @returns true if the message indicates a context overflow
  */
-export function isContextOverflow(message: AssistantMessage, contextWindow?: number): boolean {
-	// Case 1: Check error message patterns
-	if (message.stopReason === "error" && message.errorMessage) {
-		// Check known patterns
-		if (OVERFLOW_PATTERNS.some((p) => p.test(message.errorMessage!))) {
-			return true;
-		}
+export function isContextOverflow(
+  message: AssistantMessage,
+  contextWindow?: number,
+): boolean {
+  // Case 1: Check error message patterns
+  if (message.stopReason === "error" && message.errorMessage) {
+    // Check known patterns
+    if (OVERFLOW_PATTERNS.some((p) => p.test(message.errorMessage!))) {
+      return true;
+    }
 
-		// Cerebras returns 400/413 with no body for context overflow
-		// Note: 429 is rate limiting (requests/tokens per time), NOT context overflow
-		if (/^4(00|13)\s*(status code)?\s*\(no body\)/i.test(message.errorMessage)) {
-			return true;
-		}
-	}
+    // Cerebras returns 400/413 with no body for context overflow
+    // Note: 429 is rate limiting (requests/tokens per time), NOT context overflow
+    if (
+      /^4(00|13)\s*(status code)?\s*\(no body\)/i.test(message.errorMessage)
+    ) {
+      return true;
+    }
+  }
 
-	// Case 2: Silent overflow (z.ai style) - successful but usage exceeds context
-	if (contextWindow && message.stopReason === "stop") {
-		const inputTokens = message.usage.input + message.usage.cacheRead;
-		if (inputTokens > contextWindow) {
-			return true;
-		}
-	}
+  // Case 2: Silent overflow (z.ai style) - successful but usage exceeds context
+  if (contextWindow && message.stopReason === "stop") {
+    const inputTokens = message.usage.input + message.usage.cacheRead;
+    if (inputTokens > contextWindow) {
+      return true;
+    }
+  }
 
-	return false;
+  return false;
 }
 
 /**
  * Get the overflow patterns for testing purposes.
  */
 export function getOverflowPatterns(): RegExp[] {
-	return [...OVERFLOW_PATTERNS];
+  return [...OVERFLOW_PATTERNS];
 }

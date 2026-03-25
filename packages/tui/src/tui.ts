@@ -7,36 +7,45 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { isKeyRelease, matchesKey } from "./keys.js";
 import type { Terminal } from "./terminal.js";
-import { getCapabilities, isImageLine, setCellDimensions } from "./terminal-image.js";
-import { extractSegments, sliceByColumn, sliceWithWidth, visibleWidth } from "./utils.js";
+import {
+  getCapabilities,
+  isImageLine,
+  setCellDimensions,
+} from "./terminal-image.js";
+import {
+  extractSegments,
+  sliceByColumn,
+  sliceWithWidth,
+  visibleWidth,
+} from "./utils.js";
 
 /**
  * Component interface - all components must implement this
  */
 export interface Component {
-	/**
-	 * Render the component to lines for the given viewport width
-	 * @param width - Current viewport width
-	 * @returns Array of strings, each representing a line
-	 */
-	render(width: number): string[];
+  /**
+   * Render the component to lines for the given viewport width
+   * @param width - Current viewport width
+   * @returns Array of strings, each representing a line
+   */
+  render(width: number): string[];
 
-	/**
-	 * Optional handler for keyboard input when component has focus
-	 */
-	handleInput?(data: string): void;
+  /**
+   * Optional handler for keyboard input when component has focus
+   */
+  handleInput?(data: string): void;
 
-	/**
-	 * If true, component receives key release events (Kitty protocol).
-	 * Default is false - release events are filtered out.
-	 */
-	wantsKeyRelease?: boolean;
+  /**
+   * If true, component receives key release events (Kitty protocol).
+   * Default is false - release events are filtered out.
+   */
+  wantsKeyRelease?: boolean;
 
-	/**
-	 * Invalidate any cached rendering state.
-	 * Called when theme changes or when component needs to re-render from scratch.
-	 */
-	invalidate(): void;
+  /**
+   * Invalidate any cached rendering state.
+   * Called when theme changes or when component needs to re-render from scratch.
+   */
+  invalidate(): void;
 }
 
 type InputListenerResult = { consume?: boolean; data?: string } | undefined;
@@ -49,13 +58,15 @@ type InputListener = (data: string) => InputListenerResult;
  * cursor there for proper IME candidate window positioning.
  */
 export interface Focusable {
-	/** Set by TUI when focus changes. Component should emit CURSOR_MARKER when true. */
-	focused: boolean;
+  /** Set by TUI when focus changes. Component should emit CURSOR_MARKER when true. */
+  focused: boolean;
 }
 
 /** Type guard to check if a component implements Focusable */
-export function isFocusable(component: Component | null): component is Component & Focusable {
-	return component !== null && "focused" in component;
+export function isFocusable(
+  component: Component | null,
+): component is Component & Focusable {
+  return component !== null && "focused" in component;
 }
 
 /**
@@ -72,43 +83,46 @@ export { visibleWidth };
  * Anchor position for overlays
  */
 export type OverlayAnchor =
-	| "center"
-	| "top-left"
-	| "top-right"
-	| "bottom-left"
-	| "bottom-right"
-	| "top-center"
-	| "bottom-center"
-	| "left-center"
-	| "right-center";
+  | "center"
+  | "top-left"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-right"
+  | "top-center"
+  | "bottom-center"
+  | "left-center"
+  | "right-center";
 
 /**
  * Margin configuration for overlays
  */
 export interface OverlayMargin {
-	top?: number;
-	right?: number;
-	bottom?: number;
-	left?: number;
+  top?: number;
+  right?: number;
+  bottom?: number;
+  left?: number;
 }
 
 /** Value that can be absolute (number) or percentage (string like "50%") */
 export type SizeValue = number | `${number}%`;
 
 /** Parse a SizeValue into absolute value given a reference size */
-function parseSizeValue(value: SizeValue | undefined, referenceSize: number): number | undefined {
-	if (value === undefined) return undefined;
-	if (typeof value === "number") return value;
-	// Parse percentage string like "50%"
-	const match = value.match(/^(\d+(?:\.\d+)?)%$/);
-	if (match) {
-		return Math.floor((referenceSize * parseFloat(match[1])) / 100);
-	}
-	return undefined;
+function parseSizeValue(
+  value: SizeValue | undefined,
+  referenceSize: number,
+): number | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value === "number") return value;
+  // Parse percentage string like "50%"
+  const match = value.match(/^(\d+(?:\.\d+)?)%$/);
+  if (match) {
+    return Math.floor((referenceSize * parseFloat(match[1])) / 100);
+  }
+  return undefined;
 }
 
 function isTermuxSession(): boolean {
-	return Boolean(process.env.TERMUX_VERSION);
+  return Boolean(process.env.TERMUX_VERSION);
 }
 
 /**
@@ -116,95 +130,95 @@ function isTermuxSession(): boolean {
  * Values can be absolute numbers or percentage strings (e.g., "50%").
  */
 export interface OverlayOptions {
-	// === Sizing ===
-	/** Width in columns, or percentage of terminal width (e.g., "50%") */
-	width?: SizeValue;
-	/** Minimum width in columns */
-	minWidth?: number;
-	/** Maximum height in rows, or percentage of terminal height (e.g., "50%") */
-	maxHeight?: SizeValue;
+  // === Sizing ===
+  /** Width in columns, or percentage of terminal width (e.g., "50%") */
+  width?: SizeValue;
+  /** Minimum width in columns */
+  minWidth?: number;
+  /** Maximum height in rows, or percentage of terminal height (e.g., "50%") */
+  maxHeight?: SizeValue;
 
-	// === Positioning - anchor-based ===
-	/** Anchor point for positioning (default: 'center') */
-	anchor?: OverlayAnchor;
-	/** Horizontal offset from anchor position (positive = right) */
-	offsetX?: number;
-	/** Vertical offset from anchor position (positive = down) */
-	offsetY?: number;
+  // === Positioning - anchor-based ===
+  /** Anchor point for positioning (default: 'center') */
+  anchor?: OverlayAnchor;
+  /** Horizontal offset from anchor position (positive = right) */
+  offsetX?: number;
+  /** Vertical offset from anchor position (positive = down) */
+  offsetY?: number;
 
-	// === Positioning - percentage or absolute ===
-	/** Row position: absolute number, or percentage (e.g., "25%" = 25% from top) */
-	row?: SizeValue;
-	/** Column position: absolute number, or percentage (e.g., "50%" = centered horizontally) */
-	col?: SizeValue;
+  // === Positioning - percentage or absolute ===
+  /** Row position: absolute number, or percentage (e.g., "25%" = 25% from top) */
+  row?: SizeValue;
+  /** Column position: absolute number, or percentage (e.g., "50%" = centered horizontally) */
+  col?: SizeValue;
 
-	// === Margin from terminal edges ===
-	/** Margin from terminal edges. Number applies to all sides. */
-	margin?: OverlayMargin | number;
+  // === Margin from terminal edges ===
+  /** Margin from terminal edges. Number applies to all sides. */
+  margin?: OverlayMargin | number;
 
-	// === Visibility ===
-	/**
-	 * Control overlay visibility based on terminal dimensions.
-	 * If provided, overlay is only rendered when this returns true.
-	 * Called each render cycle with current terminal dimensions.
-	 */
-	visible?: (termWidth: number, termHeight: number) => boolean;
-	/** If true, don't capture keyboard focus when shown */
-	nonCapturing?: boolean;
+  // === Visibility ===
+  /**
+   * Control overlay visibility based on terminal dimensions.
+   * If provided, overlay is only rendered when this returns true.
+   * Called each render cycle with current terminal dimensions.
+   */
+  visible?: (termWidth: number, termHeight: number) => boolean;
+  /** If true, don't capture keyboard focus when shown */
+  nonCapturing?: boolean;
 }
 
 /**
  * Handle returned by showOverlay for controlling the overlay
  */
 export interface OverlayHandle {
-	/** Permanently remove the overlay (cannot be shown again) */
-	hide(): void;
-	/** Temporarily hide or show the overlay */
-	setHidden(hidden: boolean): void;
-	/** Check if overlay is temporarily hidden */
-	isHidden(): boolean;
-	/** Focus this overlay and bring it to the visual front */
-	focus(): void;
-	/** Release focus to the previous target */
-	unfocus(): void;
-	/** Check if this overlay currently has focus */
-	isFocused(): boolean;
+  /** Permanently remove the overlay (cannot be shown again) */
+  hide(): void;
+  /** Temporarily hide or show the overlay */
+  setHidden(hidden: boolean): void;
+  /** Check if overlay is temporarily hidden */
+  isHidden(): boolean;
+  /** Focus this overlay and bring it to the visual front */
+  focus(): void;
+  /** Release focus to the previous target */
+  unfocus(): void;
+  /** Check if this overlay currently has focus */
+  isFocused(): boolean;
 }
 
 /**
  * Container - a component that contains other components
  */
 export class Container implements Component {
-	children: Component[] = [];
+  children: Component[] = [];
 
-	addChild(component: Component): void {
-		this.children.push(component);
-	}
+  addChild(component: Component): void {
+    this.children.push(component);
+  }
 
-	removeChild(component: Component): void {
-		const index = this.children.indexOf(component);
-		if (index !== -1) {
-			this.children.splice(index, 1);
-		}
-	}
+  removeChild(component: Component): void {
+    const index = this.children.indexOf(component);
+    if (index !== -1) {
+      this.children.splice(index, 1);
+    }
+  }
 
-	clear(): void {
-		this.children = [];
-	}
+  clear(): void {
+    this.children = [];
+  }
 
-	invalidate(): void {
-		for (const child of this.children) {
-			child.invalidate?.();
-		}
-	}
+  invalidate(): void {
+    for (const child of this.children) {
+      child.invalidate?.();
+    }
+  }
 
-	render(width: number): string[] {
-		const lines: string[] = [];
-		for (const child of this.children) {
-			lines.push(...child.render(width));
-		}
-		return lines;
-	}
+  render(width: number): string[] {
+    const lines: string[] = [];
+    for (const child of this.children) {
+      lines.push(...child.render(width));
+    }
+    return lines;
+  }
 }
 
 /**

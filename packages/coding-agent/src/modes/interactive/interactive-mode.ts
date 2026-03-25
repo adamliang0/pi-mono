@@ -8,66 +8,95 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { AgentMessage } from "@mariozechner/pi-agent-core";
-import type { AssistantMessage, ImageContent, Message, Model, OAuthProviderId } from "@mariozechner/pi-ai";
 import type {
-	AutocompleteItem,
-	EditorComponent,
-	EditorTheme,
-	Keybinding,
-	KeyId,
-	MarkdownTheme,
-	OverlayHandle,
-	OverlayOptions,
-	SlashCommand,
+  AssistantMessage,
+  ImageContent,
+  Message,
+  Model,
+  OAuthProviderId,
+} from "@mariozechner/pi-ai";
+import type {
+  AutocompleteItem,
+  EditorComponent,
+  EditorTheme,
+  Keybinding,
+  KeyId,
+  MarkdownTheme,
+  OverlayHandle,
+  OverlayOptions,
+  SlashCommand,
 } from "@mariozechner/pi-tui";
 import {
-	CombinedAutocompleteProvider,
-	type Component,
-	Container,
-	fuzzyFilter,
-	Loader,
-	Markdown,
-	matchesKey,
-	ProcessTerminal,
-	Spacer,
-	setKeybindings,
-	Text,
-	TruncatedText,
-	TUI,
-	visibleWidth,
+  CombinedAutocompleteProvider,
+  type Component,
+  Container,
+  fuzzyFilter,
+  Loader,
+  Markdown,
+  matchesKey,
+  ProcessTerminal,
+  Spacer,
+  setKeybindings,
+  Text,
+  TruncatedText,
+  TUI,
+  visibleWidth,
 } from "@mariozechner/pi-tui";
 import { spawn, spawnSync } from "child_process";
 import {
-	APP_NAME,
-	getAgentDir,
-	getAuthPath,
-	getDebugLogPath,
-	getShareViewerUrl,
-	getUpdateInstruction,
-	VERSION,
+  APP_NAME,
+  getAgentDir,
+  getAuthPath,
+  getDebugLogPath,
+  getShareViewerUrl,
+  getUpdateInstruction,
+  VERSION,
 } from "../../config.js";
-import { type AgentSession, type AgentSessionEvent, parseSkillBlock } from "../../core/agent-session.js";
+import {
+  type AgentSession,
+  type AgentSessionEvent,
+  parseSkillBlock,
+} from "../../core/agent-session.js";
 import type { CompactionResult } from "../../core/compaction/index.js";
 import type {
-	ExtensionContext,
-	ExtensionRunner,
-	ExtensionUIContext,
-	ExtensionUIDialogOptions,
-	ExtensionWidgetOptions,
+  ExtensionContext,
+  ExtensionRunner,
+  ExtensionUIContext,
+  ExtensionUIDialogOptions,
+  ExtensionWidgetOptions,
 } from "../../core/extensions/index.js";
-import { FooterDataProvider, type ReadonlyFooterDataProvider } from "../../core/footer-data-provider.js";
-import { type AppKeybinding, KeybindingsManager } from "../../core/keybindings.js";
+import {
+  FooterDataProvider,
+  type ReadonlyFooterDataProvider,
+} from "../../core/footer-data-provider.js";
+import {
+  type AppKeybinding,
+  KeybindingsManager,
+} from "../../core/keybindings.js";
 import { createCompactionSummaryMessage } from "../../core/messages.js";
-import { findExactModelReferenceMatch, resolveModelScope } from "../../core/model-resolver.js";
+import {
+  findExactModelReferenceMatch,
+  resolveModelScope,
+} from "../../core/model-resolver.js";
 import { DefaultPackageManager } from "../../core/package-manager.js";
 import type { ResourceDiagnostic } from "../../core/resource-loader.js";
-import { type SessionContext, SessionManager } from "../../core/session-manager.js";
+import {
+  type SessionContext,
+  SessionManager,
+} from "../../core/session-manager.js";
 import { BUILTIN_SLASH_COMMANDS } from "../../core/slash-commands.js";
 import type { SourceInfo } from "../../core/source-info.js";
 import type { TruncationResult } from "../../core/tools/truncate.js";
-import { getChangelogPath, getNewEntries, parseChangelog } from "../../utils/changelog.js";
+import {
+  getChangelogPath,
+  getNewEntries,
+  parseChangelog,
+} from "../../utils/changelog.js";
 import { copyToClipboard } from "../../utils/clipboard.js";
-import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.js";
+import {
+  extensionForImageMimeType,
+  readClipboardImage,
+} from "../../utils/clipboard-image.js";
 import { parseGitUrl } from "../../utils/git.js";
 import { ensureTool } from "../../utils/tools-manager.js";
 import { ArminComponent } from "./components/armin.js";
@@ -97,51 +126,56 @@ import { TreeSelectorComponent } from "./components/tree-selector.js";
 import { UserMessageComponent } from "./components/user-message.js";
 import { UserMessageSelectorComponent } from "./components/user-message-selector.js";
 import {
-	getAvailableThemes,
-	getAvailableThemesWithPaths,
-	getEditorTheme,
-	getMarkdownTheme,
-	getThemeByName,
-	initTheme,
-	onThemeChange,
-	setRegisteredThemes,
-	setTheme,
-	setThemeInstance,
-	Theme,
-	type ThemeColor,
-	theme,
+  getAvailableThemes,
+  getAvailableThemesWithPaths,
+  getEditorTheme,
+  getMarkdownTheme,
+  getThemeByName,
+  initTheme,
+  onThemeChange,
+  setRegisteredThemes,
+  setTheme,
+  setThemeInstance,
+  Theme,
+  type ThemeColor,
+  theme,
 } from "./theme/theme.js";
 
 /** Interface for components that can be expanded/collapsed */
 interface Expandable {
-	setExpanded(expanded: boolean): void;
+  setExpanded(expanded: boolean): void;
 }
 
 function isExpandable(obj: unknown): obj is Expandable {
-	return typeof obj === "object" && obj !== null && "setExpanded" in obj && typeof obj.setExpanded === "function";
+  return (
+    typeof obj === "object" &&
+    obj !== null &&
+    "setExpanded" in obj &&
+    typeof obj.setExpanded === "function"
+  );
 }
 
 type CompactionQueuedMessage = {
-	text: string;
-	mode: "steer" | "followUp";
+  text: string;
+  mode: "steer" | "followUp";
 };
 
 /**
  * Options for InteractiveMode initialization.
  */
 export interface InteractiveModeOptions {
-	/** Providers that were migrated to auth.json (shows warning) */
-	migratedProviders?: string[];
-	/** Warning message if session model couldn't be restored */
-	modelFallbackMessage?: string;
-	/** Initial message to send on startup (can include @file content) */
-	initialMessage?: string;
-	/** Images to attach to the initial message */
-	initialImages?: ImageContent[];
-	/** Additional messages to send after the initial message */
-	initialMessages?: string[];
-	/** Force verbose startup (overrides quietStartup setting) */
-	verbose?: boolean;
+  /** Providers that were migrated to auth.json (shows warning) */
+  migratedProviders?: string[];
+  /** Warning message if session model couldn't be restored */
+  modelFallbackMessage?: string;
+  /** Initial message to send on startup (can include @file content) */
+  initialMessage?: string;
+  /** Images to attach to the initial message */
+  initialImages?: ImageContent[];
+  /** Additional messages to send after the initial message */
+  initialMessages?: string[];
+  /** Force verbose startup (overrides quietStartup setting) */
+  verbose?: boolean;
 }
 
 export class InteractiveMode {
@@ -4372,280 +4406,326 @@ export class InteractiveMode {
 | \`!!\` | Run bash command (excluded from context) |
 `;
 
-		// Add extension-registered shortcuts
-		const extensionRunner = this.session.extensionRunner;
-		if (extensionRunner) {
-			const shortcuts = extensionRunner.getShortcuts(this.keybindings.getEffectiveConfig());
-			if (shortcuts.size > 0) {
-				hotkeys += `
+    // Add extension-registered shortcuts
+    const extensionRunner = this.session.extensionRunner;
+    if (extensionRunner) {
+      const shortcuts = extensionRunner.getShortcuts(
+        this.keybindings.getEffectiveConfig(),
+      );
+      if (shortcuts.size > 0) {
+        hotkeys += `
 **Extensions**
 | Key | Action |
 |-----|--------|
 `;
-				for (const [key, shortcut] of shortcuts) {
-					const description = shortcut.description ?? shortcut.extensionPath;
-					const keyDisplay = key.replace(/\b\w/g, (c) => c.toUpperCase());
-					hotkeys += `| \`${keyDisplay}\` | ${description} |\n`;
-				}
-			}
-		}
+        for (const [key, shortcut] of shortcuts) {
+          const description = shortcut.description ?? shortcut.extensionPath;
+          const keyDisplay = key.replace(/\b\w/g, (c) => c.toUpperCase());
+          hotkeys += `| \`${keyDisplay}\` | ${description} |\n`;
+        }
+      }
+    }
 
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new DynamicBorder());
-		this.chatContainer.addChild(new Text(theme.bold(theme.fg("accent", "Keyboard Shortcuts")), 1, 0));
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new Markdown(hotkeys.trim(), 1, 1, this.getMarkdownThemeWithSettings()));
-		this.chatContainer.addChild(new DynamicBorder());
-		this.ui.requestRender();
-	}
+    this.chatContainer.addChild(new Spacer(1));
+    this.chatContainer.addChild(new DynamicBorder());
+    this.chatContainer.addChild(
+      new Text(theme.bold(theme.fg("accent", "Keyboard Shortcuts")), 1, 0),
+    );
+    this.chatContainer.addChild(new Spacer(1));
+    this.chatContainer.addChild(
+      new Markdown(hotkeys.trim(), 1, 1, this.getMarkdownThemeWithSettings()),
+    );
+    this.chatContainer.addChild(new DynamicBorder());
+    this.ui.requestRender();
+  }
 
-	private async handleClearCommand(): Promise<void> {
-		// Stop loading animation
-		if (this.loadingAnimation) {
-			this.loadingAnimation.stop();
-			this.loadingAnimation = undefined;
-		}
-		this.statusContainer.clear();
+  private async handleClearCommand(): Promise<void> {
+    // Stop loading animation
+    if (this.loadingAnimation) {
+      this.loadingAnimation.stop();
+      this.loadingAnimation = undefined;
+    }
+    this.statusContainer.clear();
 
-		// New session via session (emits extension session events)
-		await this.session.newSession();
+    // New session via session (emits extension session events)
+    await this.session.newSession();
 
-		// Clear UI state
-		this.headerContainer.clear();
-		this.chatContainer.clear();
-		this.pendingMessagesContainer.clear();
-		this.compactionQueuedMessages = [];
-		this.streamingComponent = undefined;
-		this.streamingMessage = undefined;
-		this.pendingTools.clear();
+    // Clear UI state
+    this.headerContainer.clear();
+    this.chatContainer.clear();
+    this.pendingMessagesContainer.clear();
+    this.compactionQueuedMessages = [];
+    this.streamingComponent = undefined;
+    this.streamingMessage = undefined;
+    this.pendingTools.clear();
 
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new Text(`${theme.fg("accent", "✓ New session started")}`, 1, 1));
-		this.ui.requestRender();
-	}
+    this.chatContainer.addChild(new Spacer(1));
+    this.chatContainer.addChild(
+      new Text(`${theme.fg("accent", "✓ New session started")}`, 1, 1),
+    );
+    this.ui.requestRender();
+  }
 
-	private handleDebugCommand(): void {
-		const width = this.ui.terminal.columns;
-		const height = this.ui.terminal.rows;
-		const allLines = this.ui.render(width);
+  private handleDebugCommand(): void {
+    const width = this.ui.terminal.columns;
+    const height = this.ui.terminal.rows;
+    const allLines = this.ui.render(width);
 
-		const debugLogPath = getDebugLogPath();
-		const debugData = [
-			`Debug output at ${new Date().toISOString()}`,
-			`Terminal: ${width}x${height}`,
-			`Total lines: ${allLines.length}`,
-			"",
-			"=== All rendered lines with visible widths ===",
-			...allLines.map((line, idx) => {
-				const vw = visibleWidth(line);
-				const escaped = JSON.stringify(line);
-				return `[${idx}] (w=${vw}) ${escaped}`;
-			}),
-			"",
-			"=== Agent messages (JSONL) ===",
-			...this.session.messages.map((msg) => JSON.stringify(msg)),
-			"",
-		].join("\n");
+    const debugLogPath = getDebugLogPath();
+    const debugData = [
+      `Debug output at ${new Date().toISOString()}`,
+      `Terminal: ${width}x${height}`,
+      `Total lines: ${allLines.length}`,
+      "",
+      "=== All rendered lines with visible widths ===",
+      ...allLines.map((line, idx) => {
+        const vw = visibleWidth(line);
+        const escaped = JSON.stringify(line);
+        return `[${idx}] (w=${vw}) ${escaped}`;
+      }),
+      "",
+      "=== Agent messages (JSONL) ===",
+      ...this.session.messages.map((msg) => JSON.stringify(msg)),
+      "",
+    ].join("\n");
 
-		fs.mkdirSync(path.dirname(debugLogPath), { recursive: true });
-		fs.writeFileSync(debugLogPath, debugData);
+    fs.mkdirSync(path.dirname(debugLogPath), { recursive: true });
+    fs.writeFileSync(debugLogPath, debugData);
 
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(
-			new Text(`${theme.fg("accent", "✓ Debug log written")}\n${theme.fg("muted", debugLogPath)}`, 1, 1),
-		);
-		this.ui.requestRender();
-	}
+    this.chatContainer.addChild(new Spacer(1));
+    this.chatContainer.addChild(
+      new Text(
+        `${theme.fg("accent", "✓ Debug log written")}\n${theme.fg("muted", debugLogPath)}`,
+        1,
+        1,
+      ),
+    );
+    this.ui.requestRender();
+  }
 
-	private handleArminSaysHi(): void {
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new ArminComponent(this.ui));
-		this.ui.requestRender();
-	}
+  private handleArminSaysHi(): void {
+    this.chatContainer.addChild(new Spacer(1));
+    this.chatContainer.addChild(new ArminComponent(this.ui));
+    this.ui.requestRender();
+  }
 
-	private handleDaxnuts(): void {
-		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new DaxnutsComponent(this.ui));
-		this.ui.requestRender();
-	}
+  private handleDaxnuts(): void {
+    this.chatContainer.addChild(new Spacer(1));
+    this.chatContainer.addChild(new DaxnutsComponent(this.ui));
+    this.ui.requestRender();
+  }
 
-	private checkDaxnutsEasterEgg(model: { provider: string; id: string }): void {
-		if (model.provider === "opencode" && model.id.toLowerCase().includes("kimi-k2.5")) {
-			this.handleDaxnuts();
-		}
-	}
+  private checkDaxnutsEasterEgg(model: { provider: string; id: string }): void {
+    if (
+      model.provider === "opencode" &&
+      model.id.toLowerCase().includes("kimi-k2.5")
+    ) {
+      this.handleDaxnuts();
+    }
+  }
 
-	private async handleBashCommand(command: string, excludeFromContext = false): Promise<void> {
-		const extensionRunner = this.session.extensionRunner;
+  private async handleBashCommand(
+    command: string,
+    excludeFromContext = false,
+  ): Promise<void> {
+    const extensionRunner = this.session.extensionRunner;
 
-		// Emit user_bash event to let extensions intercept
-		const eventResult = extensionRunner
-			? await extensionRunner.emitUserBash({
-					type: "user_bash",
-					command,
-					excludeFromContext,
-					cwd: process.cwd(),
-				})
-			: undefined;
+    // Emit user_bash event to let extensions intercept
+    const eventResult = extensionRunner
+      ? await extensionRunner.emitUserBash({
+          type: "user_bash",
+          command,
+          excludeFromContext,
+          cwd: process.cwd(),
+        })
+      : undefined;
 
-		// If extension returned a full result, use it directly
-		if (eventResult?.result) {
-			const result = eventResult.result;
+    // If extension returned a full result, use it directly
+    if (eventResult?.result) {
+      const result = eventResult.result;
 
-			// Create UI component for display
-			this.bashComponent = new BashExecutionComponent(command, this.ui, excludeFromContext);
-			if (this.session.isStreaming) {
-				this.pendingMessagesContainer.addChild(this.bashComponent);
-				this.pendingBashComponents.push(this.bashComponent);
-			} else {
-				this.chatContainer.addChild(this.bashComponent);
-			}
+      // Create UI component for display
+      this.bashComponent = new BashExecutionComponent(
+        command,
+        this.ui,
+        excludeFromContext,
+      );
+      if (this.session.isStreaming) {
+        this.pendingMessagesContainer.addChild(this.bashComponent);
+        this.pendingBashComponents.push(this.bashComponent);
+      } else {
+        this.chatContainer.addChild(this.bashComponent);
+      }
 
-			// Show output and complete
-			if (result.output) {
-				this.bashComponent.appendOutput(result.output);
-			}
-			this.bashComponent.setComplete(
-				result.exitCode,
-				result.cancelled,
-				result.truncated ? ({ truncated: true, content: result.output } as TruncationResult) : undefined,
-				result.fullOutputPath,
-			);
+      // Show output and complete
+      if (result.output) {
+        this.bashComponent.appendOutput(result.output);
+      }
+      this.bashComponent.setComplete(
+        result.exitCode,
+        result.cancelled,
+        result.truncated
+          ? ({ truncated: true, content: result.output } as TruncationResult)
+          : undefined,
+        result.fullOutputPath,
+      );
 
-			// Record the result in session
-			this.session.recordBashResult(command, result, { excludeFromContext });
-			this.bashComponent = undefined;
-			this.ui.requestRender();
-			return;
-		}
+      // Record the result in session
+      this.session.recordBashResult(command, result, { excludeFromContext });
+      this.bashComponent = undefined;
+      this.ui.requestRender();
+      return;
+    }
 
-		// Normal execution path (possibly with custom operations)
-		const isDeferred = this.session.isStreaming;
-		this.bashComponent = new BashExecutionComponent(command, this.ui, excludeFromContext);
+    // Normal execution path (possibly with custom operations)
+    const isDeferred = this.session.isStreaming;
+    this.bashComponent = new BashExecutionComponent(
+      command,
+      this.ui,
+      excludeFromContext,
+    );
 
-		if (isDeferred) {
-			// Show in pending area when agent is streaming
-			this.pendingMessagesContainer.addChild(this.bashComponent);
-			this.pendingBashComponents.push(this.bashComponent);
-		} else {
-			// Show in chat immediately when agent is idle
-			this.chatContainer.addChild(this.bashComponent);
-		}
-		this.ui.requestRender();
+    if (isDeferred) {
+      // Show in pending area when agent is streaming
+      this.pendingMessagesContainer.addChild(this.bashComponent);
+      this.pendingBashComponents.push(this.bashComponent);
+    } else {
+      // Show in chat immediately when agent is idle
+      this.chatContainer.addChild(this.bashComponent);
+    }
+    this.ui.requestRender();
 
-		try {
-			const result = await this.session.executeBash(
-				command,
-				(chunk) => {
-					if (this.bashComponent) {
-						this.bashComponent.appendOutput(chunk);
-						this.ui.requestRender();
-					}
-				},
-				{ excludeFromContext, operations: eventResult?.operations },
-			);
+    try {
+      const result = await this.session.executeBash(
+        command,
+        (chunk) => {
+          if (this.bashComponent) {
+            this.bashComponent.appendOutput(chunk);
+            this.ui.requestRender();
+          }
+        },
+        { excludeFromContext, operations: eventResult?.operations },
+      );
 
-			if (this.bashComponent) {
-				this.bashComponent.setComplete(
-					result.exitCode,
-					result.cancelled,
-					result.truncated ? ({ truncated: true, content: result.output } as TruncationResult) : undefined,
-					result.fullOutputPath,
-				);
-			}
-		} catch (error) {
-			if (this.bashComponent) {
-				this.bashComponent.setComplete(undefined, false);
-			}
-			this.showError(`Bash command failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-		}
+      if (this.bashComponent) {
+        this.bashComponent.setComplete(
+          result.exitCode,
+          result.cancelled,
+          result.truncated
+            ? ({ truncated: true, content: result.output } as TruncationResult)
+            : undefined,
+          result.fullOutputPath,
+        );
+      }
+    } catch (error) {
+      if (this.bashComponent) {
+        this.bashComponent.setComplete(undefined, false);
+      }
+      this.showError(
+        `Bash command failed: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
+    }
 
-		this.bashComponent = undefined;
-		this.ui.requestRender();
-	}
+    this.bashComponent = undefined;
+    this.ui.requestRender();
+  }
 
-	private async handleCompactCommand(customInstructions?: string): Promise<void> {
-		const entries = this.sessionManager.getEntries();
-		const messageCount = entries.filter((e) => e.type === "message").length;
+  private async handleCompactCommand(
+    customInstructions?: string,
+  ): Promise<void> {
+    const entries = this.sessionManager.getEntries();
+    const messageCount = entries.filter((e) => e.type === "message").length;
 
-		if (messageCount < 2) {
-			this.showWarning("Nothing to compact (no messages yet)");
-			return;
-		}
+    if (messageCount < 2) {
+      this.showWarning("Nothing to compact (no messages yet)");
+      return;
+    }
 
-		await this.executeCompaction(customInstructions, false);
-	}
+    await this.executeCompaction(customInstructions, false);
+  }
 
-	private async executeCompaction(customInstructions?: string, isAuto = false): Promise<CompactionResult | undefined> {
-		// Stop loading animation
-		if (this.loadingAnimation) {
-			this.loadingAnimation.stop();
-			this.loadingAnimation = undefined;
-		}
-		this.statusContainer.clear();
+  private async executeCompaction(
+    customInstructions?: string,
+    isAuto = false,
+  ): Promise<CompactionResult | undefined> {
+    // Stop loading animation
+    if (this.loadingAnimation) {
+      this.loadingAnimation.stop();
+      this.loadingAnimation = undefined;
+    }
+    this.statusContainer.clear();
 
-		// Set up escape handler during compaction
-		const originalOnEscape = this.defaultEditor.onEscape;
-		this.defaultEditor.onEscape = () => {
-			this.session.abortCompaction();
-		};
+    // Set up escape handler during compaction
+    const originalOnEscape = this.defaultEditor.onEscape;
+    this.defaultEditor.onEscape = () => {
+      this.session.abortCompaction();
+    };
 
-		// Show compacting status
-		this.chatContainer.addChild(new Spacer(1));
-		const cancelHint = `(${keyText("app.interrupt")} to cancel)`;
-		const label = isAuto ? `Auto-compacting context... ${cancelHint}` : `Compacting context... ${cancelHint}`;
-		const compactingLoader = new Loader(
-			this.ui,
-			(spinner) => theme.fg("accent", spinner),
-			(text) => theme.fg("muted", text),
-			label,
-		);
-		this.statusContainer.addChild(compactingLoader);
-		this.ui.requestRender();
+    // Show compacting status
+    this.chatContainer.addChild(new Spacer(1));
+    const cancelHint = `(${keyText("app.interrupt")} to cancel)`;
+    const label = isAuto
+      ? `Auto-compacting context... ${cancelHint}`
+      : `Compacting context... ${cancelHint}`;
+    const compactingLoader = new Loader(
+      this.ui,
+      (spinner) => theme.fg("accent", spinner),
+      (text) => theme.fg("muted", text),
+      label,
+    );
+    this.statusContainer.addChild(compactingLoader);
+    this.ui.requestRender();
 
-		let result: CompactionResult | undefined;
+    let result: CompactionResult | undefined;
 
-		try {
-			result = await this.session.compact(customInstructions);
+    try {
+      result = await this.session.compact(customInstructions);
 
-			// Rebuild UI
-			this.rebuildChatFromMessages();
+      // Rebuild UI
+      this.rebuildChatFromMessages();
 
-			// Add compaction component at bottom so user sees it without scrolling
-			const msg = createCompactionSummaryMessage(result.summary, result.tokensBefore, new Date().toISOString());
-			this.addMessageToChat(msg);
+      // Add compaction component at bottom so user sees it without scrolling
+      const msg = createCompactionSummaryMessage(
+        result.summary,
+        result.tokensBefore,
+        new Date().toISOString(),
+      );
+      this.addMessageToChat(msg);
 
-			this.footer.invalidate();
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			if (message === "Compaction cancelled" || (error instanceof Error && error.name === "AbortError")) {
-				this.showError("Compaction cancelled");
-			} else {
-				this.showError(`Compaction failed: ${message}`);
-			}
-		} finally {
-			compactingLoader.stop();
-			this.statusContainer.clear();
-			this.defaultEditor.onEscape = originalOnEscape;
-		}
-		void this.flushCompactionQueue({ willRetry: false });
-		return result;
-	}
+      this.footer.invalidate();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (
+        message === "Compaction cancelled" ||
+        (error instanceof Error && error.name === "AbortError")
+      ) {
+        this.showError("Compaction cancelled");
+      } else {
+        this.showError(`Compaction failed: ${message}`);
+      }
+    } finally {
+      compactingLoader.stop();
+      this.statusContainer.clear();
+      this.defaultEditor.onEscape = originalOnEscape;
+    }
+    void this.flushCompactionQueue({ willRetry: false });
+    return result;
+  }
 
-	stop(): void {
-		if (this.loadingAnimation) {
-			this.loadingAnimation.stop();
-			this.loadingAnimation = undefined;
-		}
-		this.clearExtensionTerminalInputListeners();
-		this.footer.dispose();
-		this.footerDataProvider.dispose();
-		if (this.unsubscribe) {
-			this.unsubscribe();
-		}
-		if (this.isInitialized) {
-			this.ui.stop();
-			this.isInitialized = false;
-		}
-	}
+  stop(): void {
+    if (this.loadingAnimation) {
+      this.loadingAnimation.stop();
+      this.loadingAnimation = undefined;
+    }
+    this.clearExtensionTerminalInputListeners();
+    this.footer.dispose();
+    this.footerDataProvider.dispose();
+    if (this.unsubscribe) {
+      this.unsubscribe();
+    }
+    if (this.isInitialized) {
+      this.ui.stop();
+      this.isInitialized = false;
+    }
+  }
 }

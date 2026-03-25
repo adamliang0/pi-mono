@@ -20,20 +20,20 @@ export async function withFileMutationQueue<T>(filePath: string, fn: () => Promi
 	const key = getMutationQueueKey(filePath);
 	const currentQueue = fileMutationQueues.get(key) ?? Promise.resolve();
 
-	let releaseNext!: () => void;
-	const nextQueue = new Promise<void>((resolveQueue) => {
-		releaseNext = resolveQueue;
-	});
-	const chainedQueue = currentQueue.then(() => nextQueue);
-	fileMutationQueues.set(key, chainedQueue);
+  let releaseNext!: () => void;
+  const nextQueue = new Promise<void>((resolveQueue) => {
+    releaseNext = resolveQueue;
+  });
+  const chainedQueue = currentQueue.then(() => nextQueue);
+  fileMutationQueues.set(key, chainedQueue);
 
-	await currentQueue;
-	try {
-		return await fn();
-	} finally {
-		releaseNext();
-		if (fileMutationQueues.get(key) === chainedQueue) {
-			fileMutationQueues.delete(key);
-		}
-	}
+  await currentQueue;
+  try {
+    return await fn();
+  } finally {
+    releaseNext();
+    if (fileMutationQueues.get(key) === chainedQueue) {
+      fileMutationQueues.delete(key);
+    }
+  }
 }

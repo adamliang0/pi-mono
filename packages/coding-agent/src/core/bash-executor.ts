@@ -12,7 +12,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import stripAnsi from "strip-ansi";
 import { sanitizeBinaryOutput } from "../utils/shell.js";
-import { type BashOperations, createLocalBashOperations } from "./tools/bash.js";
+import {
+  type BashOperations,
+  createLocalBashOperations,
+} from "./tools/bash.js";
 import { DEFAULT_MAX_BYTES, truncateTail } from "./tools/truncate.js";
 
 // ============================================================================
@@ -20,23 +23,23 @@ import { DEFAULT_MAX_BYTES, truncateTail } from "./tools/truncate.js";
 // ============================================================================
 
 export interface BashExecutorOptions {
-	/** Callback for streaming output chunks (already sanitized) */
-	onChunk?: (chunk: string) => void;
-	/** AbortSignal for cancellation */
-	signal?: AbortSignal;
+  /** Callback for streaming output chunks (already sanitized) */
+  onChunk?: (chunk: string) => void;
+  /** AbortSignal for cancellation */
+  signal?: AbortSignal;
 }
 
 export interface BashResult {
-	/** Combined stdout + stderr output (sanitized, possibly truncated) */
-	output: string;
-	/** Process exit code (undefined if killed/cancelled) */
-	exitCode: number | undefined;
-	/** Whether the command was cancelled via signal */
-	cancelled: boolean;
-	/** Whether the output was truncated */
-	truncated: boolean;
-	/** Path to temp file containing full output (if output exceeded truncation threshold) */
-	fullOutputPath?: string;
+  /** Combined stdout + stderr output (sanitized, possibly truncated) */
+  output: string;
+  /** Process exit code (undefined if killed/cancelled) */
+  exitCode: number | undefined;
+  /** Whether the command was cancelled via signal */
+  cancelled: boolean;
+  /** Whether the output was truncated */
+  truncated: boolean;
+  /** Path to temp file containing full output (if output exceeded truncation threshold) */
+  fullOutputPath?: string;
 }
 
 // ============================================================================
@@ -56,8 +59,16 @@ export interface BashResult {
  * @param options - Optional streaming callback and abort signal
  * @returns Promise resolving to execution result
  */
-export function executeBash(command: string, options?: BashExecutorOptions): Promise<BashResult> {
-	return executeBashWithOperations(command, process.cwd(), createLocalBashOperations(), options);
+export function executeBash(
+  command: string,
+  options?: BashExecutorOptions,
+): Promise<BashResult> {
+  return executeBashWithOperations(
+    command,
+    process.cwd(),
+    createLocalBashOperations(),
+    options,
+  );
 }
 
 /**
@@ -65,94 +76,100 @@ export function executeBash(command: string, options?: BashExecutorOptions): Pro
  * Used for remote execution (SSH, containers, etc.).
  */
 export async function executeBashWithOperations(
-	command: string,
-	cwd: string,
-	operations: BashOperations,
-	options?: BashExecutorOptions,
+  command: string,
+  cwd: string,
+  operations: BashOperations,
+  options?: BashExecutorOptions,
 ): Promise<BashResult> {
-	const outputChunks: string[] = [];
-	let outputBytes = 0;
-	const maxOutputBytes = DEFAULT_MAX_BYTES * 2;
+  const outputChunks: string[] = [];
+  let outputBytes = 0;
+  const maxOutputBytes = DEFAULT_MAX_BYTES * 2;
 
-	let tempFilePath: string | undefined;
-	let tempFileStream: WriteStream | undefined;
-	let totalBytes = 0;
+  let tempFilePath: string | undefined;
+  let tempFileStream: WriteStream | undefined;
+  let totalBytes = 0;
 
-	const decoder = new TextDecoder();
+  const decoder = new TextDecoder();
 
-	const onData = (data: Buffer) => {
-		totalBytes += data.length;
+  const onData = (data: Buffer) => {
+    totalBytes += data.length;
 
-		// Sanitize: strip ANSI, replace binary garbage, normalize newlines
-		const text = sanitizeBinaryOutput(stripAnsi(decoder.decode(data, { stream: true }))).replace(/\r/g, "");
+    // Sanitize: strip ANSI, replace binary garbage, normalize newlines
+    const text = sanitizeBinaryOutput(
+      stripAnsi(decoder.decode(data, { stream: true })),
+    ).replace(/\r/g, "");
 
-		// Start writing to temp file if exceeds threshold
-		if (totalBytes > DEFAULT_MAX_BYTES && !tempFilePath) {
-			const id = randomBytes(8).toString("hex");
-			tempFilePath = join(tmpdir(), `pi-bash-${id}.log`);
-			tempFileStream = createWriteStream(tempFilePath);
-			for (const chunk of outputChunks) {
-				tempFileStream.write(chunk);
-			}
-		}
+    // Start writing to temp file if exceeds threshold
+    if (totalBytes > DEFAULT_MAX_BYTES && !tempFilePath) {
+      const id = randomBytes(8).toString("hex");
+      tempFilePath = join(tmpdir(), `pi-bash-${id}.log`);
+      tempFileStream = createWriteStream(tempFilePath);
+      for (const chunk of outputChunks) {
+        tempFileStream.write(chunk);
+      }
+    }
 
-		if (tempFileStream) {
-			tempFileStream.write(text);
-		}
+    if (tempFileStream) {
+      tempFileStream.write(text);
+    }
 
-		// Keep rolling buffer
-		outputChunks.push(text);
-		outputBytes += text.length;
-		while (outputBytes > maxOutputBytes && outputChunks.length > 1) {
-			const removed = outputChunks.shift()!;
-			outputBytes -= removed.length;
-		}
+    // Keep rolling buffer
+    outputChunks.push(text);
+    outputBytes += text.length;
+    while (outputBytes > maxOutputBytes && outputChunks.length > 1) {
+      const removed = outputChunks.shift()!;
+      outputBytes -= removed.length;
+    }
 
-		// Stream to callback
-		if (options?.onChunk) {
-			options.onChunk(text);
-		}
-	};
+    // Stream to callback
+    if (options?.onChunk) {
+      options.onChunk(text);
+    }
+  };
 
-	try {
-		const result = await operations.exec(command, cwd, {
-			onData,
-			signal: options?.signal,
-		});
+  try {
+    const result = await operations.exec(command, cwd, {
+      onData,
+      signal: options?.signal,
+    });
 
-		if (tempFileStream) {
-			tempFileStream.end();
-		}
+    if (tempFileStream) {
+      tempFileStream.end();
+    }
 
-		const fullOutput = outputChunks.join("");
-		const truncationResult = truncateTail(fullOutput);
-		const cancelled = options?.signal?.aborted ?? false;
+    const fullOutput = outputChunks.join("");
+    const truncationResult = truncateTail(fullOutput);
+    const cancelled = options?.signal?.aborted ?? false;
 
-		return {
-			output: truncationResult.truncated ? truncationResult.content : fullOutput,
-			exitCode: cancelled ? undefined : (result.exitCode ?? undefined),
-			cancelled,
-			truncated: truncationResult.truncated,
-			fullOutputPath: tempFilePath,
-		};
-	} catch (err) {
-		if (tempFileStream) {
-			tempFileStream.end();
-		}
+    return {
+      output: truncationResult.truncated
+        ? truncationResult.content
+        : fullOutput,
+      exitCode: cancelled ? undefined : (result.exitCode ?? undefined),
+      cancelled,
+      truncated: truncationResult.truncated,
+      fullOutputPath: tempFilePath,
+    };
+  } catch (err) {
+    if (tempFileStream) {
+      tempFileStream.end();
+    }
 
-		// Check if it was an abort
-		if (options?.signal?.aborted) {
-			const fullOutput = outputChunks.join("");
-			const truncationResult = truncateTail(fullOutput);
-			return {
-				output: truncationResult.truncated ? truncationResult.content : fullOutput,
-				exitCode: undefined,
-				cancelled: true,
-				truncated: truncationResult.truncated,
-				fullOutputPath: tempFilePath,
-			};
-		}
+    // Check if it was an abort
+    if (options?.signal?.aborted) {
+      const fullOutput = outputChunks.join("");
+      const truncationResult = truncateTail(fullOutput);
+      return {
+        output: truncationResult.truncated
+          ? truncationResult.content
+          : fullOutput,
+        exitCode: undefined,
+        cancelled: true,
+        truncated: truncationResult.truncated,
+        fullOutputPath: tempFilePath,
+      };
+    }
 
-		throw err;
-	}
+    throw err;
+  }
 }

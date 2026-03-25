@@ -27,27 +27,34 @@ import { writeFileSync } from "fs";
 import { beforeAll, describe, expect, it } from "vitest";
 import { getModel } from "../src/models.js";
 import { completeSimple, getEnvApiKey } from "../src/stream.js";
-import type { Api, AssistantMessage, Message, Model, Tool, ToolResultMessage } from "../src/types.js";
+import type {
+  Api,
+  AssistantMessage,
+  Message,
+  Model,
+  Tool,
+  ToolResultMessage,
+} from "../src/types.js";
 import { hasAzureOpenAICredentials } from "./azure-utils.js";
 import { resolveApiKey } from "./oauth.js";
 
 // Simple tool for testing
 const testToolSchema = Type.Object({
-	value: Type.Number({ description: "A number to double" }),
+  value: Type.Number({ description: "A number to double" }),
 });
 
 const testTool: Tool<typeof testToolSchema> = {
-	name: "double_number",
-	description: "Doubles a number and returns the result",
-	parameters: testToolSchema,
+  name: "double_number",
+  description: "Doubles a number and returns the result",
+  parameters: testToolSchema,
 };
 
 // Provider/model pairs to test
 interface ProviderModelPair {
-	provider: string;
-	model: string;
-	label: string;
-	apiOverride?: Api;
+  provider: string;
+  model: string;
+  label: string;
+  apiOverride?: Api;
 }
 
 const PROVIDER_MODEL_PAIRS: ProviderModelPair[] = [
@@ -93,7 +100,7 @@ const PROVIDER_MODEL_PAIRS: ProviderModelPair[] = [
 	// Mistral
 	{ provider: "mistral", model: "devstral-medium-latest", label: "mistral-devstral-medium" },
 	// MiniMax
-	{ provider: "minimax", model: "MiniMax-M2.7", label: "minimax-m2.7" },
+	{ provider: "minimax", model: "MiniMax-M2.1", label: "minimax-m2.1" },
 	// OpenCode Zen
 	{ provider: "opencode", model: "big-pickle", label: "zen-big-pickle" },
 	{ provider: "opencode", model: "claude-sonnet-4-5", label: "zen-claude-sonnet-4-5" },
@@ -108,50 +115,55 @@ const PROVIDER_MODEL_PAIRS: ProviderModelPair[] = [
 
 // Cached context structure
 interface CachedContext {
-	label: string;
-	provider: string;
-	model: string;
-	api: Api;
-	messages: Message[];
-	generatedAt: string;
+  label: string;
+  provider: string;
+  model: string;
+  api: Api;
+  messages: Message[];
+  generatedAt: string;
 }
 
 /**
  * Get API key for provider - checks OAuth storage first, then env vars
  */
 async function getApiKey(provider: string): Promise<string | undefined> {
-	const oauthKey = await resolveApiKey(provider);
-	if (oauthKey) return oauthKey;
-	return getEnvApiKey(provider);
+  const oauthKey = await resolveApiKey(provider);
+  if (oauthKey) return oauthKey;
+  return getEnvApiKey(provider);
 }
 
 /**
  * Synchronous check for API key availability (env vars only, for skipIf)
  */
 function hasApiKey(provider: string): boolean {
-	if (provider === "azure-openai-responses") {
-		return hasAzureOpenAICredentials();
-	}
-	return !!getEnvApiKey(provider);
+  if (provider === "azure-openai-responses") {
+    return hasAzureOpenAICredentials();
+  }
+  return !!getEnvApiKey(provider);
 }
 
 /**
  * Check if any provider has API keys available (for skipIf at describe level)
  */
 function hasAnyApiKey(): boolean {
-	return PROVIDER_MODEL_PAIRS.some((pair) => hasApiKey(pair.provider));
+  return PROVIDER_MODEL_PAIRS.some((pair) => hasApiKey(pair.provider));
 }
 
-function dumpFailurePayload(params: { label: string; error: string; payload?: unknown; messages: Message[] }): void {
-	const filename = `/tmp/pi-handoff-${params.label}-${Date.now()}.json`;
-	const body = {
-		label: params.label,
-		error: params.error,
-		payload: params.payload,
-		messages: params.messages,
-	};
-	writeFileSync(filename, JSON.stringify(body, null, 2));
-	console.log(`Wrote failure payload to ${filename}`);
+function dumpFailurePayload(params: {
+  label: string;
+  error: string;
+  payload?: unknown;
+  messages: Message[];
+}): void {
+  const filename = `/tmp/pi-handoff-${params.label}-${Date.now()}.json`;
+  const body = {
+    label: params.label,
+    error: params.error,
+    payload: params.payload,
+    messages: params.messages,
+  };
+  writeFileSync(filename, JSON.stringify(body, null, 2));
+  console.log(`Wrote failure payload to ${filename}`);
 }
 
 /**
@@ -159,300 +171,326 @@ function dumpFailurePayload(params: { label: string; error: string; payload?: un
  * Makes a real API call to get authentic tool call IDs and thinking blocks.
  */
 async function generateContext(
-	pair: ProviderModelPair,
-	apiKey: string,
+  pair: ProviderModelPair,
+  apiKey: string,
 ): Promise<{ messages: Message[]; api: Api } | null> {
-	const baseModel = (getModel as (p: string, m: string) => Model<Api> | undefined)(pair.provider, pair.model);
-	if (!baseModel) {
-		console.log(`  Model not found: ${pair.provider}/${pair.model}`);
-		return null;
-	}
+  const baseModel = (
+    getModel as (p: string, m: string) => Model<Api> | undefined
+  )(pair.provider, pair.model);
+  if (!baseModel) {
+    console.log(`  Model not found: ${pair.provider}/${pair.model}`);
+    return null;
+  }
 
-	const model: Model<Api> = pair.apiOverride ? { ...baseModel, api: pair.apiOverride } : baseModel;
+  const model: Model<Api> = pair.apiOverride
+    ? { ...baseModel, api: pair.apiOverride }
+    : baseModel;
 
-	const userMessage: Message = {
-		role: "user",
-		content: "Please double the number 21 using the double_number tool.",
-		timestamp: Date.now(),
-	};
+  const userMessage: Message = {
+    role: "user",
+    content: "Please double the number 21 using the double_number tool.",
+    timestamp: Date.now(),
+  };
 
-	const supportsReasoning = model.reasoning === true;
-	let lastPayload: unknown;
-	let assistantResponse: AssistantMessage;
-	try {
-		assistantResponse = await completeSimple(
-			model,
-			{
-				systemPrompt: "You are a helpful assistant. Use the provided tool to complete the task.",
-				messages: [userMessage],
-				tools: [testTool],
-			},
-			{
-				apiKey,
-				reasoning: supportsReasoning ? "high" : undefined,
-				onPayload: (payload) => {
-					lastPayload = payload;
-				},
-			},
-		);
-	} catch (error) {
-		const msg = error instanceof Error ? error.message : String(error);
-		console.log(`  Initial request failed: ${msg}`);
-		dumpFailurePayload({
-			label: `${pair.label}-initial`,
-			error: msg,
-			payload: lastPayload,
-			messages: [userMessage],
-		});
-		return null;
-	}
+  const supportsReasoning = model.reasoning === true;
+  let lastPayload: unknown;
+  let assistantResponse: AssistantMessage;
+  try {
+    assistantResponse = await completeSimple(
+      model,
+      {
+        systemPrompt:
+          "You are a helpful assistant. Use the provided tool to complete the task.",
+        messages: [userMessage],
+        tools: [testTool],
+      },
+      {
+        apiKey,
+        reasoning: supportsReasoning ? "high" : undefined,
+        onPayload: (payload) => {
+          lastPayload = payload;
+        },
+      },
+    );
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`  Initial request failed: ${msg}`);
+    dumpFailurePayload({
+      label: `${pair.label}-initial`,
+      error: msg,
+      payload: lastPayload,
+      messages: [userMessage],
+    });
+    return null;
+  }
 
-	if (assistantResponse.stopReason === "error") {
-		console.log(`  Initial request error: ${assistantResponse.errorMessage}`);
-		dumpFailurePayload({
-			label: `${pair.label}-initial`,
-			error: assistantResponse.errorMessage || "Unknown error",
-			payload: lastPayload,
-			messages: [userMessage],
-		});
-		return null;
-	}
+  if (assistantResponse.stopReason === "error") {
+    console.log(`  Initial request error: ${assistantResponse.errorMessage}`);
+    dumpFailurePayload({
+      label: `${pair.label}-initial`,
+      error: assistantResponse.errorMessage || "Unknown error",
+      payload: lastPayload,
+      messages: [userMessage],
+    });
+    return null;
+  }
 
-	const toolCall = assistantResponse.content.find((c) => c.type === "toolCall");
-	if (!toolCall || toolCall.type !== "toolCall") {
-		console.log(`  No tool call in response (stopReason: ${assistantResponse.stopReason})`);
-		return {
-			messages: [userMessage, assistantResponse],
-			api: model.api,
-		};
-	}
+  const toolCall = assistantResponse.content.find((c) => c.type === "toolCall");
+  if (!toolCall || toolCall.type !== "toolCall") {
+    console.log(
+      `  No tool call in response (stopReason: ${assistantResponse.stopReason})`,
+    );
+    return {
+      messages: [userMessage, assistantResponse],
+      api: model.api,
+    };
+  }
 
-	console.log(`  Tool call ID: ${toolCall.id}`);
+  console.log(`  Tool call ID: ${toolCall.id}`);
 
-	const toolResult: ToolResultMessage = {
-		role: "toolResult",
-		toolCallId: toolCall.id,
-		toolName: toolCall.name,
-		content: [{ type: "text", text: "42" }],
-		isError: false,
-		timestamp: Date.now(),
-	};
+  const toolResult: ToolResultMessage = {
+    role: "toolResult",
+    toolCallId: toolCall.id,
+    toolName: toolCall.name,
+    content: [{ type: "text", text: "42" }],
+    isError: false,
+    timestamp: Date.now(),
+  };
 
-	let finalResponse: AssistantMessage;
-	const messagesForFinal = [userMessage, assistantResponse, toolResult];
-	try {
-		finalResponse = await completeSimple(
-			model,
-			{
-				systemPrompt: "You are a helpful assistant.",
-				messages: messagesForFinal,
-				tools: [testTool],
-			},
-			{
-				apiKey,
-				reasoning: supportsReasoning ? "high" : undefined,
-				onPayload: (payload) => {
-					lastPayload = payload;
-				},
-			},
-		);
-	} catch (error) {
-		const msg = error instanceof Error ? error.message : String(error);
-		console.log(`  Final request failed: ${msg}`);
-		dumpFailurePayload({
-			label: `${pair.label}-final`,
-			error: msg,
-			payload: lastPayload,
-			messages: messagesForFinal,
-		});
-		return null;
-	}
+  let finalResponse: AssistantMessage;
+  const messagesForFinal = [userMessage, assistantResponse, toolResult];
+  try {
+    finalResponse = await completeSimple(
+      model,
+      {
+        systemPrompt: "You are a helpful assistant.",
+        messages: messagesForFinal,
+        tools: [testTool],
+      },
+      {
+        apiKey,
+        reasoning: supportsReasoning ? "high" : undefined,
+        onPayload: (payload) => {
+          lastPayload = payload;
+        },
+      },
+    );
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.log(`  Final request failed: ${msg}`);
+    dumpFailurePayload({
+      label: `${pair.label}-final`,
+      error: msg,
+      payload: lastPayload,
+      messages: messagesForFinal,
+    });
+    return null;
+  }
 
-	if (finalResponse.stopReason === "error") {
-		console.log(`  Final request error: ${finalResponse.errorMessage}`);
-		dumpFailurePayload({
-			label: `${pair.label}-final`,
-			error: finalResponse.errorMessage || "Unknown error",
-			payload: lastPayload,
-			messages: messagesForFinal,
-		});
-		return null;
-	}
+  if (finalResponse.stopReason === "error") {
+    console.log(`  Final request error: ${finalResponse.errorMessage}`);
+    dumpFailurePayload({
+      label: `${pair.label}-final`,
+      error: finalResponse.errorMessage || "Unknown error",
+      payload: lastPayload,
+      messages: messagesForFinal,
+    });
+    return null;
+  }
 
-	return {
-		messages: [userMessage, assistantResponse, toolResult, finalResponse],
-		api: model.api,
-	};
+  return {
+    messages: [userMessage, assistantResponse, toolResult, finalResponse],
+    api: model.api,
+  };
 }
 
 describe.skipIf(!hasAnyApiKey())("Cross-Provider Handoff", () => {
-	let contexts: Record<string, CachedContext>;
-	let availablePairs: ProviderModelPair[];
+  let contexts: Record<string, CachedContext>;
+  let availablePairs: ProviderModelPair[];
 
-	beforeAll(async () => {
-		contexts = {};
-		availablePairs = [];
+  beforeAll(async () => {
+    contexts = {};
+    availablePairs = [];
 
-		console.log("\n=== Generating Fixtures ===\n");
+    console.log("\n=== Generating Fixtures ===\n");
 
-		for (const pair of PROVIDER_MODEL_PAIRS) {
-			const apiKey = await getApiKey(pair.provider);
-			if (!apiKey) {
-				console.log(`[${pair.label}] Skipping - no auth for ${pair.provider}`);
-				continue;
-			}
+    for (const pair of PROVIDER_MODEL_PAIRS) {
+      const apiKey = await getApiKey(pair.provider);
+      if (!apiKey) {
+        console.log(`[${pair.label}] Skipping - no auth for ${pair.provider}`);
+        continue;
+      }
 
-			console.log(`[${pair.label}] Generating fixture...`);
-			const result = await generateContext(pair, apiKey);
+      console.log(`[${pair.label}] Generating fixture...`);
+      const result = await generateContext(pair, apiKey);
 
-			if (!result || result.messages.length < 4) {
-				console.log(`[${pair.label}] Failed to generate fixture, skipping`);
-				continue;
-			}
+      if (!result || result.messages.length < 4) {
+        console.log(`[${pair.label}] Failed to generate fixture, skipping`);
+        continue;
+      }
 
-			contexts[pair.label] = {
-				label: pair.label,
-				provider: pair.provider,
-				model: pair.model,
-				api: result.api,
-				messages: result.messages,
-				generatedAt: new Date().toISOString(),
-			};
-			availablePairs.push(pair);
-			console.log(`[${pair.label}] Generated ${result.messages.length} messages`);
-		}
+      contexts[pair.label] = {
+        label: pair.label,
+        provider: pair.provider,
+        model: pair.model,
+        api: result.api,
+        messages: result.messages,
+        generatedAt: new Date().toISOString(),
+      };
+      availablePairs.push(pair);
+      console.log(
+        `[${pair.label}] Generated ${result.messages.length} messages`,
+      );
+    }
 
-		console.log(`\n=== ${availablePairs.length}/${PROVIDER_MODEL_PAIRS.length} contexts available ===\n`);
-	}, 300000);
+    console.log(
+      `\n=== ${availablePairs.length}/${PROVIDER_MODEL_PAIRS.length} contexts available ===\n`,
+    );
+  }, 300000);
 
-	it.skipIf(!hasAnyApiKey())("should have at least 2 fixtures to test handoffs", () => {
-		expect(Object.keys(contexts).length).toBeGreaterThanOrEqual(2);
-	});
+  it.skipIf(!hasAnyApiKey())(
+    "should have at least 2 fixtures to test handoffs",
+    () => {
+      expect(Object.keys(contexts).length).toBeGreaterThanOrEqual(2);
+    },
+  );
 
-	it.skipIf(!hasAnyApiKey())(
-		"should handle cross-provider handoffs for each target",
-		async () => {
-			const contextLabels = Object.keys(contexts);
+  it.skipIf(!hasAnyApiKey())(
+    "should handle cross-provider handoffs for each target",
+    async () => {
+      const contextLabels = Object.keys(contexts);
 
-			if (contextLabels.length < 2) {
-				console.log("Not enough fixtures for handoff test, skipping");
-				return;
-			}
+      if (contextLabels.length < 2) {
+        console.log("Not enough fixtures for handoff test, skipping");
+        return;
+      }
 
-			console.log("\n=== Testing Cross-Provider Handoffs ===\n");
+      console.log("\n=== Testing Cross-Provider Handoffs ===\n");
 
-			const results: { target: string; success: boolean; error?: string }[] = [];
+      const results: { target: string; success: boolean; error?: string }[] =
+        [];
 
-			for (const targetPair of availablePairs) {
-				const apiKey = await getApiKey(targetPair.provider);
-				if (!apiKey) {
-					console.log(`[Target: ${targetPair.label}] Skipping - no auth`);
-					continue;
-				}
+      for (const targetPair of availablePairs) {
+        const apiKey = await getApiKey(targetPair.provider);
+        if (!apiKey) {
+          console.log(`[Target: ${targetPair.label}] Skipping - no auth`);
+          continue;
+        }
 
-				// Collect messages from ALL OTHER contexts
-				const otherMessages: Message[] = [];
-				for (const [label, ctx] of Object.entries(contexts)) {
-					if (label === targetPair.label) continue;
-					otherMessages.push(...ctx.messages);
-				}
+        // Collect messages from ALL OTHER contexts
+        const otherMessages: Message[] = [];
+        for (const [label, ctx] of Object.entries(contexts)) {
+          if (label === targetPair.label) continue;
+          otherMessages.push(...ctx.messages);
+        }
 
-				if (otherMessages.length === 0) {
-					console.log(`[Target: ${targetPair.label}] Skipping - no other contexts`);
-					continue;
-				}
+        if (otherMessages.length === 0) {
+          console.log(
+            `[Target: ${targetPair.label}] Skipping - no other contexts`,
+          );
+          continue;
+        }
 
-				const allMessages: Message[] = [
-					...otherMessages,
-					{
-						role: "user",
-						content:
-							"Great, thanks for all that help! Now just say 'Hello, handoff successful!' to confirm you received everything.",
-						timestamp: Date.now(),
-					},
-				];
+        const allMessages: Message[] = [
+          ...otherMessages,
+          {
+            role: "user",
+            content:
+              "Great, thanks for all that help! Now just say 'Hello, handoff successful!' to confirm you received everything.",
+            timestamp: Date.now(),
+          },
+        ];
 
-				const baseModel = (getModel as (p: string, m: string) => Model<Api> | undefined)(
-					targetPair.provider,
-					targetPair.model,
-				);
-				if (!baseModel) {
-					console.log(`[Target: ${targetPair.label}] Model not found`);
-					continue;
-				}
+        const baseModel = (
+          getModel as (p: string, m: string) => Model<Api> | undefined
+        )(targetPair.provider, targetPair.model);
+        if (!baseModel) {
+          console.log(`[Target: ${targetPair.label}] Model not found`);
+          continue;
+        }
 
-				const model: Model<Api> = targetPair.apiOverride
-					? { ...baseModel, api: targetPair.apiOverride }
-					: baseModel;
-				const supportsReasoning = model.reasoning === true;
+        const model: Model<Api> = targetPair.apiOverride
+          ? { ...baseModel, api: targetPair.apiOverride }
+          : baseModel;
+        const supportsReasoning = model.reasoning === true;
 
-				console.log(
-					`[Target: ${targetPair.label}] Testing with ${otherMessages.length} messages from other providers...`,
-				);
+        console.log(
+          `[Target: ${targetPair.label}] Testing with ${otherMessages.length} messages from other providers...`,
+        );
 
-				let lastPayload: unknown;
-				try {
-					const response = await completeSimple(
-						model,
-						{
-							systemPrompt: "You are a helpful assistant.",
-							messages: allMessages,
-							tools: [testTool],
-						},
-						{
-							apiKey,
-							reasoning: supportsReasoning ? "high" : undefined,
-							onPayload: (payload) => {
-								lastPayload = payload;
-							},
-						},
-					);
+        let lastPayload: unknown;
+        try {
+          const response = await completeSimple(
+            model,
+            {
+              systemPrompt: "You are a helpful assistant.",
+              messages: allMessages,
+              tools: [testTool],
+            },
+            {
+              apiKey,
+              reasoning: supportsReasoning ? "high" : undefined,
+              onPayload: (payload) => {
+                lastPayload = payload;
+              },
+            },
+          );
 
-					if (response.stopReason === "error") {
-						console.log(`[Target: ${targetPair.label}] FAILED: ${response.errorMessage}`);
-						dumpFailurePayload({
-							label: targetPair.label,
-							error: response.errorMessage || "Unknown error",
-							payload: lastPayload,
-							messages: allMessages,
-						});
-						results.push({ target: targetPair.label, success: false, error: response.errorMessage });
-					} else {
-						const text = response.content
-							.filter((c) => c.type === "text")
-							.map((c) => c.text)
-							.join(" ");
-						const preview = text.slice(0, 100).replace(/\n/g, " ");
-						console.log(`[Target: ${targetPair.label}] SUCCESS: ${preview}...`);
-						results.push({ target: targetPair.label, success: true });
-					}
-				} catch (error) {
-					const msg = error instanceof Error ? error.message : String(error);
-					console.log(`[Target: ${targetPair.label}] EXCEPTION: ${msg}`);
-					dumpFailurePayload({
-						label: targetPair.label,
-						error: msg,
-						payload: lastPayload,
-						messages: allMessages,
-					});
-					results.push({ target: targetPair.label, success: false, error: msg });
-				}
-			}
+          if (response.stopReason === "error") {
+            console.log(
+              `[Target: ${targetPair.label}] FAILED: ${response.errorMessage}`,
+            );
+            dumpFailurePayload({
+              label: targetPair.label,
+              error: response.errorMessage || "Unknown error",
+              payload: lastPayload,
+              messages: allMessages,
+            });
+            results.push({
+              target: targetPair.label,
+              success: false,
+              error: response.errorMessage,
+            });
+          } else {
+            const text = response.content
+              .filter((c) => c.type === "text")
+              .map((c) => c.text)
+              .join(" ");
+            const preview = text.slice(0, 100).replace(/\n/g, " ");
+            console.log(`[Target: ${targetPair.label}] SUCCESS: ${preview}...`);
+            results.push({ target: targetPair.label, success: true });
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error);
+          console.log(`[Target: ${targetPair.label}] EXCEPTION: ${msg}`);
+          dumpFailurePayload({
+            label: targetPair.label,
+            error: msg,
+            payload: lastPayload,
+            messages: allMessages,
+          });
+          results.push({
+            target: targetPair.label,
+            success: false,
+            error: msg,
+          });
+        }
+      }
 
-			console.log("\n=== Results Summary ===\n");
-			const successes = results.filter((r) => r.success);
-			const failures = results.filter((r) => !r.success);
+      console.log("\n=== Results Summary ===\n");
+      const successes = results.filter((r) => r.success);
+      const failures = results.filter((r) => !r.success);
 
-			console.log(`Passed: ${successes.length}/${results.length}`);
-			if (failures.length > 0) {
-				console.log("\nFailures:");
-				for (const f of failures) {
-					console.log(`  - ${f.target}: ${f.error}`);
-				}
-			}
+      console.log(`Passed: ${successes.length}/${results.length}`);
+      if (failures.length > 0) {
+        console.log("\nFailures:");
+        for (const f of failures) {
+          console.log(`  - ${f.target}: ${f.error}`);
+        }
+      }
 
-			expect(failures.length).toBe(0);
-		},
-		600000,
-	);
+      expect(failures.length).toBe(0);
+    },
+    600000,
+  );
 });

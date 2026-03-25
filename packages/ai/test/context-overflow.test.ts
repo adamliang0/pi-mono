@@ -24,12 +24,13 @@ import { resolveApiKey } from "./oauth.js";
 
 // Resolve OAuth tokens at module level (async, runs before tests)
 const oauthTokens = await Promise.all([
-	resolveApiKey("github-copilot"),
-	resolveApiKey("google-gemini-cli"),
-	resolveApiKey("google-antigravity"),
-	resolveApiKey("openai-codex"),
+  resolveApiKey("github-copilot"),
+  resolveApiKey("google-gemini-cli"),
+  resolveApiKey("google-antigravity"),
+  resolveApiKey("openai-codex"),
 ]);
-const [githubCopilotToken, geminiCliToken, antigravityToken, openaiCodexToken] = oauthTokens;
+const [githubCopilotToken, geminiCliToken, antigravityToken, openaiCodexToken] =
+  oauthTokens;
 
 // Lorem ipsum paragraph for realistic token estimation
 const LOREM_IPSUM = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. `;
@@ -37,60 +38,63 @@ const LOREM_IPSUM = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. Se
 // Generate a string that will exceed the context window
 // Using chars/4 as token estimate (works better with varied text than repeated chars)
 function generateOverflowContent(contextWindow: number): string {
-	const targetTokens = contextWindow + 10000; // Exceed by 10k tokens
-	const targetChars = targetTokens * 4 * 1.5;
-	const repetitions = Math.ceil(targetChars / LOREM_IPSUM.length);
-	return LOREM_IPSUM.repeat(repetitions);
+  const targetTokens = contextWindow + 10000; // Exceed by 10k tokens
+  const targetChars = targetTokens * 4 * 1.5;
+  const repetitions = Math.ceil(targetChars / LOREM_IPSUM.length);
+  return LOREM_IPSUM.repeat(repetitions);
 }
 
 interface OverflowResult {
-	provider: string;
-	model: string;
-	contextWindow: number;
-	stopReason: string;
-	errorMessage: string | undefined;
-	usage: Usage;
-	hasUsageData: boolean;
-	response: AssistantMessage;
+  provider: string;
+  model: string;
+  contextWindow: number;
+  stopReason: string;
+  errorMessage: string | undefined;
+  usage: Usage;
+  hasUsageData: boolean;
+  response: AssistantMessage;
 }
 
-async function testContextOverflow(model: Model<any>, apiKey: string): Promise<OverflowResult> {
-	const overflowContent = generateOverflowContent(model.contextWindow);
+async function testContextOverflow(
+  model: Model<any>,
+  apiKey: string,
+): Promise<OverflowResult> {
+  const overflowContent = generateOverflowContent(model.contextWindow);
 
-	const context: Context = {
-		systemPrompt: "You are a helpful assistant.",
-		messages: [
-			{
-				role: "user",
-				content: overflowContent,
-				timestamp: Date.now(),
-			},
-		],
-	};
+  const context: Context = {
+    systemPrompt: "You are a helpful assistant.",
+    messages: [
+      {
+        role: "user",
+        content: overflowContent,
+        timestamp: Date.now(),
+      },
+    ],
+  };
 
-	const response = await complete(model, context, { apiKey });
+  const response = await complete(model, context, { apiKey });
 
-	const hasUsageData = response.usage.input > 0 || response.usage.cacheRead > 0;
+  const hasUsageData = response.usage.input > 0 || response.usage.cacheRead > 0;
 
-	return {
-		provider: model.provider,
-		model: model.id,
-		contextWindow: model.contextWindow,
-		stopReason: response.stopReason,
-		errorMessage: response.errorMessage,
-		usage: response.usage,
-		hasUsageData,
-		response,
-	};
+  return {
+    provider: model.provider,
+    model: model.id,
+    contextWindow: model.contextWindow,
+    stopReason: response.stopReason,
+    errorMessage: response.errorMessage,
+    usage: response.usage,
+    hasUsageData,
+    response,
+  };
 }
 
 function logResult(result: OverflowResult) {
-	console.log(`\n${result.provider} / ${result.model}:`);
-	console.log(`  contextWindow: ${result.contextWindow}`);
-	console.log(`  stopReason: ${result.stopReason}`);
-	console.log(`  errorMessage: ${result.errorMessage}`);
-	console.log(`  usage: ${JSON.stringify(result.usage)}`);
-	console.log(`  hasUsageData: ${result.hasUsageData}`);
+  console.log(`\n${result.provider} / ${result.model}:`);
+  console.log(`  contextWindow: ${result.contextWindow}`);
+  console.log(`  stopReason: ${result.stopReason}`);
+  console.log(`  errorMessage: ${result.errorMessage}`);
+  console.log(`  usage: ${JSON.stringify(result.usage)}`);
+  console.log(`  hasUsageData: ${result.hasUsageData}`);
 }
 
 // =============================================================================
@@ -436,8 +440,8 @@ describe("Context overflow error handling", () => {
 	// =============================================================================
 
 	describe.skipIf(!process.env.MINIMAX_API_KEY)("MiniMax", () => {
-		it("MiniMax-M2.7 - should detect overflow via isContextOverflow", async () => {
-			const model = getModel("minimax", "MiniMax-M2.7");
+		it("MiniMax-M2.1 - should detect overflow via isContextOverflow", async () => {
+			const model = getModel("minimax", "MiniMax-M2.1");
 			const result = await testContextOverflow(model, process.env.MINIMAX_API_KEY!);
 			logResult(result);
 

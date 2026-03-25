@@ -7,7 +7,9 @@
 // JavaScript REPL Tool
 // ============================================================================
 
-export const JAVASCRIPT_REPL_TOOL_DESCRIPTION = (runtimeProviderDescriptions: string[]) => `# JavaScript REPL
+export const JAVASCRIPT_REPL_TOOL_DESCRIPTION = (
+  runtimeProviderDescriptions: string[],
+) => `# JavaScript REPL
 
 ## Purpose
 Execute JavaScript code in a sandboxed browser environment with full Web APIs.
@@ -67,7 +69,9 @@ ${runtimeProviderDescriptions.join("\n\n")}
 // Artifacts Tool
 // ============================================================================
 
-export const ARTIFACTS_TOOL_DESCRIPTION = (runtimeProviderDescriptions: string[]) => `# Artifacts
+export const ARTIFACTS_TOOL_DESCRIPTION = (
+  runtimeProviderDescriptions: string[],
+) => `# Artifacts
 
 Create and manage persistent files that live alongside the conversation.
 

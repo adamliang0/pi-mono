@@ -5,42 +5,42 @@ import lockfile from "proper-lockfile";
 import { CONFIG_DIR_NAME, getAgentDir } from "../config.js";
 
 export interface CompactionSettings {
-	enabled?: boolean; // default: true
-	reserveTokens?: number; // default: 16384
-	keepRecentTokens?: number; // default: 20000
+  enabled?: boolean; // default: true
+  reserveTokens?: number; // default: 16384
+  keepRecentTokens?: number; // default: 20000
 }
 
 export interface BranchSummarySettings {
-	reserveTokens?: number; // default: 16384 (tokens reserved for prompt + LLM response)
-	skipPrompt?: boolean; // default: false - when true, skips "Summarize branch?" prompt and defaults to no summary
+  reserveTokens?: number; // default: 16384 (tokens reserved for prompt + LLM response)
+  skipPrompt?: boolean; // default: false - when true, skips "Summarize branch?" prompt and defaults to no summary
 }
 
 export interface RetrySettings {
-	enabled?: boolean; // default: true
-	maxRetries?: number; // default: 3
-	baseDelayMs?: number; // default: 2000 (exponential backoff: 2s, 4s, 8s)
-	maxDelayMs?: number; // default: 60000 (max server-requested delay before failing)
+  enabled?: boolean; // default: true
+  maxRetries?: number; // default: 3
+  baseDelayMs?: number; // default: 2000 (exponential backoff: 2s, 4s, 8s)
+  maxDelayMs?: number; // default: 60000 (max server-requested delay before failing)
 }
 
 export interface TerminalSettings {
-	showImages?: boolean; // default: true (only relevant if terminal supports images)
-	clearOnShrink?: boolean; // default: false (clear empty rows when content shrinks)
+  showImages?: boolean; // default: true (only relevant if terminal supports images)
+  clearOnShrink?: boolean; // default: false (clear empty rows when content shrinks)
 }
 
 export interface ImageSettings {
-	autoResize?: boolean; // default: true (resize images to 2000x2000 max for better model compatibility)
-	blockImages?: boolean; // default: false - when true, prevents all images from being sent to LLM providers
+  autoResize?: boolean; // default: true (resize images to 2000x2000 max for better model compatibility)
+  blockImages?: boolean; // default: false - when true, prevents all images from being sent to LLM providers
 }
 
 export interface ThinkingBudgetsSettings {
-	minimal?: number;
-	low?: number;
-	medium?: number;
-	high?: number;
+  minimal?: number;
+  low?: number;
+  medium?: number;
+  high?: number;
 }
 
 export interface MarkdownSettings {
-	codeBlockIndent?: string; // default: "  "
+  codeBlockIndent?: string; // default: "  "
 }
 
 export type TransportSetting = Transport;
@@ -51,14 +51,14 @@ export type TransportSetting = Transport;
  * - Object form: filter which resources to load
  */
 export type PackageSource =
-	| string
-	| {
-			source: string;
-			extensions?: string[];
-			skills?: string[];
-			prompts?: string[];
-			themes?: string[];
-	  };
+  | string
+  | {
+      source: string;
+      extensions?: string[];
+      skills?: string[];
+      prompts?: string[];
+      themes?: string[];
+    };
 
 export interface Settings {
 	lastChangelogVersion?: string;
@@ -99,128 +99,141 @@ export interface Settings {
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
 function deepMergeSettings(base: Settings, overrides: Settings): Settings {
-	const result: Settings = { ...base };
+  const result: Settings = { ...base };
 
-	for (const key of Object.keys(overrides) as (keyof Settings)[]) {
-		const overrideValue = overrides[key];
-		const baseValue = base[key];
+  for (const key of Object.keys(overrides) as (keyof Settings)[]) {
+    const overrideValue = overrides[key];
+    const baseValue = base[key];
 
-		if (overrideValue === undefined) {
-			continue;
-		}
+    if (overrideValue === undefined) {
+      continue;
+    }
 
-		// For nested objects, merge recursively
-		if (
-			typeof overrideValue === "object" &&
-			overrideValue !== null &&
-			!Array.isArray(overrideValue) &&
-			typeof baseValue === "object" &&
-			baseValue !== null &&
-			!Array.isArray(baseValue)
-		) {
-			(result as Record<string, unknown>)[key] = { ...baseValue, ...overrideValue };
-		} else {
-			// For primitives and arrays, override value wins
-			(result as Record<string, unknown>)[key] = overrideValue;
-		}
-	}
+    // For nested objects, merge recursively
+    if (
+      typeof overrideValue === "object" &&
+      overrideValue !== null &&
+      !Array.isArray(overrideValue) &&
+      typeof baseValue === "object" &&
+      baseValue !== null &&
+      !Array.isArray(baseValue)
+    ) {
+      (result as Record<string, unknown>)[key] = {
+        ...baseValue,
+        ...overrideValue,
+      };
+    } else {
+      // For primitives and arrays, override value wins
+      (result as Record<string, unknown>)[key] = overrideValue;
+    }
+  }
 
-	return result;
+  return result;
 }
 
 export type SettingsScope = "global" | "project";
 
 export interface SettingsStorage {
-	withLock(scope: SettingsScope, fn: (current: string | undefined) => string | undefined): void;
+  withLock(
+    scope: SettingsScope,
+    fn: (current: string | undefined) => string | undefined,
+  ): void;
 }
 
 export interface SettingsError {
-	scope: SettingsScope;
-	error: Error;
+  scope: SettingsScope;
+  error: Error;
 }
 
 export class FileSettingsStorage implements SettingsStorage {
-	private globalSettingsPath: string;
-	private projectSettingsPath: string;
+  private globalSettingsPath: string;
+  private projectSettingsPath: string;
 
-	constructor(cwd: string = process.cwd(), agentDir: string = getAgentDir()) {
-		this.globalSettingsPath = join(agentDir, "settings.json");
-		this.projectSettingsPath = join(cwd, CONFIG_DIR_NAME, "settings.json");
-	}
+  constructor(cwd: string = process.cwd(), agentDir: string = getAgentDir()) {
+    this.globalSettingsPath = join(agentDir, "settings.json");
+    this.projectSettingsPath = join(cwd, CONFIG_DIR_NAME, "settings.json");
+  }
 
-	private acquireLockSyncWithRetry(path: string): () => void {
-		const maxAttempts = 10;
-		const delayMs = 20;
-		let lastError: unknown;
+  private acquireLockSyncWithRetry(path: string): () => void {
+    const maxAttempts = 10;
+    const delayMs = 20;
+    let lastError: unknown;
 
-		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-			try {
-				return lockfile.lockSync(path, { realpath: false });
-			} catch (error) {
-				const code =
-					typeof error === "object" && error !== null && "code" in error
-						? String((error as { code?: unknown }).code)
-						: undefined;
-				if (code !== "ELOCKED" || attempt === maxAttempts) {
-					throw error;
-				}
-				lastError = error;
-				const start = Date.now();
-				while (Date.now() - start < delayMs) {
-					// Sleep synchronously to avoid changing callers to async.
-				}
-			}
-		}
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return lockfile.lockSync(path, { realpath: false });
+      } catch (error) {
+        const code =
+          typeof error === "object" && error !== null && "code" in error
+            ? String((error as { code?: unknown }).code)
+            : undefined;
+        if (code !== "ELOCKED" || attempt === maxAttempts) {
+          throw error;
+        }
+        lastError = error;
+        const start = Date.now();
+        while (Date.now() - start < delayMs) {
+          // Sleep synchronously to avoid changing callers to async.
+        }
+      }
+    }
 
-		throw (lastError as Error) ?? new Error("Failed to acquire settings lock");
-	}
+    throw (lastError as Error) ?? new Error("Failed to acquire settings lock");
+  }
 
-	withLock(scope: SettingsScope, fn: (current: string | undefined) => string | undefined): void {
-		const path = scope === "global" ? this.globalSettingsPath : this.projectSettingsPath;
-		const dir = dirname(path);
+  withLock(
+    scope: SettingsScope,
+    fn: (current: string | undefined) => string | undefined,
+  ): void {
+    const path =
+      scope === "global" ? this.globalSettingsPath : this.projectSettingsPath;
+    const dir = dirname(path);
 
-		let release: (() => void) | undefined;
-		try {
-			// Only create directory and lock if file exists or we need to write
-			const fileExists = existsSync(path);
-			if (fileExists) {
-				release = this.acquireLockSyncWithRetry(path);
-			}
-			const current = fileExists ? readFileSync(path, "utf-8") : undefined;
-			const next = fn(current);
-			if (next !== undefined) {
-				// Only create directory when we actually need to write
-				if (!existsSync(dir)) {
-					mkdirSync(dir, { recursive: true });
-				}
-				if (!release) {
-					release = this.acquireLockSyncWithRetry(path);
-				}
-				writeFileSync(path, next, "utf-8");
-			}
-		} finally {
-			if (release) {
-				release();
-			}
-		}
-	}
+    let release: (() => void) | undefined;
+    try {
+      // Only create directory and lock if file exists or we need to write
+      const fileExists = existsSync(path);
+      if (fileExists) {
+        release = this.acquireLockSyncWithRetry(path);
+      }
+      const current = fileExists ? readFileSync(path, "utf-8") : undefined;
+      const next = fn(current);
+      if (next !== undefined) {
+        // Only create directory when we actually need to write
+        if (!existsSync(dir)) {
+          mkdirSync(dir, { recursive: true });
+        }
+        if (!release) {
+          release = this.acquireLockSyncWithRetry(path);
+        }
+        writeFileSync(path, next, "utf-8");
+      }
+    } finally {
+      if (release) {
+        release();
+      }
+    }
+  }
 }
 
 export class InMemorySettingsStorage implements SettingsStorage {
-	private global: string | undefined;
-	private project: string | undefined;
+  private global: string | undefined;
+  private project: string | undefined;
 
-	withLock(scope: SettingsScope, fn: (current: string | undefined) => string | undefined): void {
-		const current = scope === "global" ? this.global : this.project;
-		const next = fn(current);
-		if (next !== undefined) {
-			if (scope === "global") {
-				this.global = next;
-			} else {
-				this.project = next;
-			}
-		}
-	}
+  withLock(
+    scope: SettingsScope,
+    fn: (current: string | undefined) => string | undefined,
+  ): void {
+    const current = scope === "global" ? this.global : this.project;
+    const next = fn(current);
+    if (next !== undefined) {
+      if (scope === "global") {
+        this.global = next;
+      } else {
+        this.project = next;
+      }
+    }
+  }
 }
 
 export class SettingsManager {

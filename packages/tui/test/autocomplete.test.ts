@@ -7,43 +7,46 @@ import { afterEach, beforeEach, describe, it, test } from "node:test";
 import { CombinedAutocompleteProvider } from "../src/autocomplete.js";
 
 const resolveFdPath = (): string | null => {
-	const command = process.platform === "win32" ? "where" : "which";
-	const result = spawnSync(command, ["fd"], { encoding: "utf-8" });
-	if (result.status !== 0 || !result.stdout) {
-		return null;
-	}
+  const command = process.platform === "win32" ? "where" : "which";
+  const result = spawnSync(command, ["fd"], { encoding: "utf-8" });
+  if (result.status !== 0 || !result.stdout) {
+    return null;
+  }
 
-	const firstLine = result.stdout.split(/\r?\n/).find(Boolean);
-	return firstLine ? firstLine.trim() : null;
+  const firstLine = result.stdout.split(/\r?\n/).find(Boolean);
+  return firstLine ? firstLine.trim() : null;
 };
 
 type FolderStructure = {
-	dirs?: string[];
-	files?: Record<string, string>;
+  dirs?: string[];
+  files?: Record<string, string>;
 };
 
-const setupFolder = (baseDir: string, structure: FolderStructure = {}): void => {
-	const dirs = structure.dirs ?? [];
-	const files = structure.files ?? {};
+const setupFolder = (
+  baseDir: string,
+  structure: FolderStructure = {},
+): void => {
+  const dirs = structure.dirs ?? [];
+  const files = structure.files ?? {};
 
-	dirs.forEach((dir) => {
-		mkdirSync(join(baseDir, dir), { recursive: true });
-	});
-	Object.entries(files).forEach(([filePath, contents]) => {
-		const fullPath = join(baseDir, filePath);
-		mkdirSync(dirname(fullPath), { recursive: true });
-		writeFileSync(fullPath, contents);
-	});
+  dirs.forEach((dir) => {
+    mkdirSync(join(baseDir, dir), { recursive: true });
+  });
+  Object.entries(files).forEach(([filePath, contents]) => {
+    const fullPath = join(baseDir, filePath);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, contents);
+  });
 };
 
 const fdPath = resolveFdPath();
 const isFdInstalled = Boolean(fdPath);
 
 const requireFdPath = (): string => {
-	if (!fdPath) {
-		throw new Error("fd is not available");
-	}
-	return fdPath;
+  if (!fdPath) {
+    throw new Error("fd is not available");
+  }
+  return fdPath;
 };
 
 const getSuggestions = (

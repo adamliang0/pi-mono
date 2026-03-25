@@ -2,11 +2,20 @@ import { Type } from "@sinclair/typebox";
 import { describe, expect, it } from "vitest";
 import { getModel } from "../src/models.js";
 import { complete } from "../src/stream.js";
-import type { Api, Context, Model, StreamOptions, ToolResultMessage } from "../src/types.js";
+import type {
+  Api,
+  Context,
+  Model,
+  StreamOptions,
+  ToolResultMessage,
+} from "../src/types.js";
 
 type StreamOptionsWithExtras = StreamOptions & Record<string, unknown>;
 
-import { hasAzureOpenAICredentials, resolveAzureDeploymentName } from "./azure-utils.js";
+import {
+  hasAzureOpenAICredentials,
+  resolveAzureDeploymentName,
+} from "./azure-utils.js";
 import { hasBedrockCredentials } from "./bedrock-utils.js";
 import { resolveApiKey } from "./oauth.js";
 
@@ -15,13 +24,19 @@ const emptySchema = Type.Object({});
 
 // Resolve OAuth tokens at module level (async, runs before tests)
 const oauthTokens = await Promise.all([
-	resolveApiKey("anthropic"),
-	resolveApiKey("github-copilot"),
-	resolveApiKey("google-gemini-cli"),
-	resolveApiKey("google-antigravity"),
-	resolveApiKey("openai-codex"),
+  resolveApiKey("anthropic"),
+  resolveApiKey("github-copilot"),
+  resolveApiKey("google-gemini-cli"),
+  resolveApiKey("google-antigravity"),
+  resolveApiKey("openai-codex"),
 ]);
-const [anthropicOAuthToken, githubCopilotToken, geminiCliToken, antigravityToken, openaiCodexToken] = oauthTokens;
+const [
+  anthropicOAuthToken,
+  githubCopilotToken,
+  geminiCliToken,
+  antigravityToken,
+  openaiCodexToken,
+] = oauthTokens;
 
 /**
  * Test for Unicode surrogate pair handling in tool results.
@@ -34,60 +49,63 @@ const [anthropicOAuthToken, githubCopilotToken, geminiCliToken, antigravityToken
  * "The request body is not valid JSON: no low surrogate in string: line 1 column 197667"
  */
 
-async function testEmojiInToolResults<TApi extends Api>(llm: Model<TApi>, options: StreamOptionsWithExtras = {}) {
-	const toolCallId = llm.provider === "mistral" ? "testtool1" : "test_1";
-	// Simulate a tool that returns emoji
-	const context: Context = {
-		systemPrompt: "You are a helpful assistant.",
-		messages: [
-			{
-				role: "user",
-				content: "Use the test tool",
-				timestamp: Date.now(),
-			},
-			{
-				role: "assistant",
-				content: [
-					{
-						type: "toolCall",
-						id: toolCallId,
-						name: "test_tool",
-						arguments: {},
-					},
-				],
-				api: llm.api,
-				provider: llm.provider,
-				model: llm.id,
-				usage: {
-					input: 0,
-					output: 0,
-					cacheRead: 0,
-					cacheWrite: 0,
-					totalTokens: 0,
-					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-				},
-				stopReason: "toolUse",
-				timestamp: Date.now(),
-			},
-		],
-		tools: [
-			{
-				name: "test_tool",
-				description: "A test tool",
-				parameters: emptySchema,
-			},
-		],
-	};
+async function testEmojiInToolResults<TApi extends Api>(
+  llm: Model<TApi>,
+  options: StreamOptionsWithExtras = {},
+) {
+  const toolCallId = llm.provider === "mistral" ? "testtool1" : "test_1";
+  // Simulate a tool that returns emoji
+  const context: Context = {
+    systemPrompt: "You are a helpful assistant.",
+    messages: [
+      {
+        role: "user",
+        content: "Use the test tool",
+        timestamp: Date.now(),
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: toolCallId,
+            name: "test_tool",
+            arguments: {},
+          },
+        ],
+        api: llm.api,
+        provider: llm.provider,
+        model: llm.id,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+      },
+    ],
+    tools: [
+      {
+        name: "test_tool",
+        description: "A test tool",
+        parameters: emptySchema,
+      },
+    ],
+  };
 
-	// Add tool result with various problematic Unicode characters
-	const toolResult: ToolResultMessage = {
-		role: "toolResult",
-		toolCallId: toolCallId,
-		toolName: "test_tool",
-		content: [
-			{
-				type: "text",
-				text: `Test with emoji 🙈 and other characters:
+  // Add tool result with various problematic Unicode characters
+  const toolResult: ToolResultMessage = {
+    role: "toolResult",
+    toolCallId: toolCallId,
+    toolName: "test_tool",
+    content: [
+      {
+        type: "text",
+        text: `Test with emoji 🙈 and other characters:
 - Monkey emoji: 🙈
 - Thumbs up: 👍
 - Heart: ❤️
@@ -98,82 +116,85 @@ async function testEmojiInToolResults<TApi extends Api>(llm: Model<TApi>, option
 - Chinese: 你好
 - Mathematical symbols: ∑∫∂√
 - Special quotes: "curly" 'quotes'`,
-			},
-		],
-		isError: false,
-		timestamp: Date.now(),
-	};
+      },
+    ],
+    isError: false,
+    timestamp: Date.now(),
+  };
 
-	context.messages.push(toolResult);
+  context.messages.push(toolResult);
 
-	// Add follow-up user message
-	context.messages.push({
-		role: "user",
-		content: "Summarize the tool result briefly.",
-		timestamp: Date.now(),
-	});
+  // Add follow-up user message
+  context.messages.push({
+    role: "user",
+    content: "Summarize the tool result briefly.",
+    timestamp: Date.now(),
+  });
 
-	// This should not throw a surrogate pair error
-	const response = await complete(llm, context, options);
+  // This should not throw a surrogate pair error
+  const response = await complete(llm, context, options);
 
-	expect(response.stopReason).not.toBe("error");
-	expect(response.errorMessage).toBeFalsy();
-	expect(response.content.length).toBeGreaterThan(0);
+  expect(response.stopReason).not.toBe("error");
+  expect(response.errorMessage).toBeFalsy();
+  expect(response.content.length).toBeGreaterThan(0);
 }
 
-async function testRealWorldLinkedInData<TApi extends Api>(llm: Model<TApi>, options: StreamOptionsWithExtras = {}) {
-	const toolCallId = llm.provider === "mistral" ? "linkedin1" : "linkedin_1";
-	const context: Context = {
-		systemPrompt: "You are a helpful assistant.",
-		messages: [
-			{
-				role: "user",
-				content: "Use the linkedin tool to get comments",
-				timestamp: Date.now(),
-			},
-			{
-				role: "assistant",
-				content: [
-					{
-						type: "toolCall",
-						id: toolCallId,
-						name: "linkedin_skill",
-						arguments: {},
-					},
-				],
-				api: llm.api,
-				provider: llm.provider,
-				model: llm.id,
-				usage: {
-					input: 0,
-					output: 0,
-					cacheRead: 0,
-					cacheWrite: 0,
-					totalTokens: 0,
-					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-				},
-				stopReason: "toolUse",
-				timestamp: Date.now(),
-			},
-		],
-		tools: [
-			{
-				name: "linkedin_skill",
-				description: "Get LinkedIn comments",
-				parameters: emptySchema,
-			},
-		],
-	};
+async function testRealWorldLinkedInData<TApi extends Api>(
+  llm: Model<TApi>,
+  options: StreamOptionsWithExtras = {},
+) {
+  const toolCallId = llm.provider === "mistral" ? "linkedin1" : "linkedin_1";
+  const context: Context = {
+    systemPrompt: "You are a helpful assistant.",
+    messages: [
+      {
+        role: "user",
+        content: "Use the linkedin tool to get comments",
+        timestamp: Date.now(),
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: toolCallId,
+            name: "linkedin_skill",
+            arguments: {},
+          },
+        ],
+        api: llm.api,
+        provider: llm.provider,
+        model: llm.id,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+      },
+    ],
+    tools: [
+      {
+        name: "linkedin_skill",
+        description: "Get LinkedIn comments",
+        parameters: emptySchema,
+      },
+    ],
+  };
 
-	// Real-world tool result from LinkedIn with emoji
-	const toolResult: ToolResultMessage = {
-		role: "toolResult",
-		toolCallId: toolCallId,
-		toolName: "linkedin_skill",
-		content: [
-			{
-				type: "text",
-				text: `Post: Hab einen "Generative KI für Nicht-Techniker" Workshop gebaut.
+  // Real-world tool result from LinkedIn with emoji
+  const toolResult: ToolResultMessage = {
+    role: "toolResult",
+    toolCallId: toolCallId,
+    toolName: "linkedin_skill",
+    content: [
+      {
+        type: "text",
+        text: `Post: Hab einen "Generative KI für Nicht-Techniker" Workshop gebaut.
 Unanswered Comments: 2
 
 => {
@@ -188,100 +209,108 @@ Unanswered Comments: 2
     }
   ]
 }`,
-			},
-		],
-		isError: false,
-		timestamp: Date.now(),
-	};
+      },
+    ],
+    isError: false,
+    timestamp: Date.now(),
+  };
 
-	context.messages.push(toolResult);
+  context.messages.push(toolResult);
 
-	context.messages.push({
-		role: "user",
-		content: "How many comments are there?",
-		timestamp: Date.now(),
-	});
+  context.messages.push({
+    role: "user",
+    content: "How many comments are there?",
+    timestamp: Date.now(),
+  });
 
-	// This should not throw a surrogate pair error
-	const response = await complete(llm, context, options);
+  // This should not throw a surrogate pair error
+  const response = await complete(llm, context, options);
 
-	expect(response.stopReason).not.toBe("error");
-	expect(response.errorMessage).toBeFalsy();
-	expect(response.content.some((b) => b.type === "text")).toBe(true);
+  expect(response.stopReason).not.toBe("error");
+  expect(response.errorMessage).toBeFalsy();
+  expect(response.content.some((b) => b.type === "text")).toBe(true);
 }
 
-async function testUnpairedHighSurrogate<TApi extends Api>(llm: Model<TApi>, options: StreamOptionsWithExtras = {}) {
-	const toolCallId = llm.provider === "mistral" ? "testtool2" : "test_2";
-	const context: Context = {
-		systemPrompt: "You are a helpful assistant.",
-		messages: [
-			{
-				role: "user",
-				content: "Use the test tool",
-				timestamp: Date.now(),
-			},
-			{
-				role: "assistant",
-				content: [
-					{
-						type: "toolCall",
-						id: toolCallId,
-						name: "test_tool",
-						arguments: {},
-					},
-				],
-				api: llm.api,
-				provider: llm.provider,
-				model: llm.id,
-				usage: {
-					input: 0,
-					output: 0,
-					cacheRead: 0,
-					cacheWrite: 0,
-					totalTokens: 0,
-					cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-				},
-				stopReason: "toolUse",
-				timestamp: Date.now(),
-			},
-		],
-		tools: [
-			{
-				name: "test_tool",
-				description: "A test tool",
-				parameters: emptySchema,
-			},
-		],
-	};
+async function testUnpairedHighSurrogate<TApi extends Api>(
+  llm: Model<TApi>,
+  options: StreamOptionsWithExtras = {},
+) {
+  const toolCallId = llm.provider === "mistral" ? "testtool2" : "test_2";
+  const context: Context = {
+    systemPrompt: "You are a helpful assistant.",
+    messages: [
+      {
+        role: "user",
+        content: "Use the test tool",
+        timestamp: Date.now(),
+      },
+      {
+        role: "assistant",
+        content: [
+          {
+            type: "toolCall",
+            id: toolCallId,
+            name: "test_tool",
+            arguments: {},
+          },
+        ],
+        api: llm.api,
+        provider: llm.provider,
+        model: llm.id,
+        usage: {
+          input: 0,
+          output: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+          totalTokens: 0,
+          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+        },
+        stopReason: "toolUse",
+        timestamp: Date.now(),
+      },
+    ],
+    tools: [
+      {
+        name: "test_tool",
+        description: "A test tool",
+        parameters: emptySchema,
+      },
+    ],
+  };
 
-	// Construct a string with an intentionally unpaired high surrogate
-	// This simulates what might happen if text processing corrupts emoji
-	const unpairedSurrogate = String.fromCharCode(0xd83d); // High surrogate without low surrogate
+  // Construct a string with an intentionally unpaired high surrogate
+  // This simulates what might happen if text processing corrupts emoji
+  const unpairedSurrogate = String.fromCharCode(0xd83d); // High surrogate without low surrogate
 
-	const toolResult: ToolResultMessage = {
-		role: "toolResult",
-		toolCallId: toolCallId,
-		toolName: "test_tool",
-		content: [{ type: "text", text: `Text with unpaired surrogate: ${unpairedSurrogate} <- should be sanitized` }],
-		isError: false,
-		timestamp: Date.now(),
-	};
+  const toolResult: ToolResultMessage = {
+    role: "toolResult",
+    toolCallId: toolCallId,
+    toolName: "test_tool",
+    content: [
+      {
+        type: "text",
+        text: `Text with unpaired surrogate: ${unpairedSurrogate} <- should be sanitized`,
+      },
+    ],
+    isError: false,
+    timestamp: Date.now(),
+  };
 
-	context.messages.push(toolResult);
+  context.messages.push(toolResult);
 
-	context.messages.push({
-		role: "user",
-		content: "What did the tool return?",
-		timestamp: Date.now(),
-	});
+  context.messages.push({
+    role: "user",
+    content: "What did the tool return?",
+    timestamp: Date.now(),
+  });
 
-	// This should not throw a surrogate pair error
-	// The unpaired surrogate should be sanitized before sending to API
-	const response = await complete(llm, context, options);
+  // This should not throw a surrogate pair error
+  // The unpaired surrogate should be sanitized before sending to API
+  const response = await complete(llm, context, options);
 
-	expect(response.stopReason).not.toBe("error");
-	expect(response.errorMessage).toBeFalsy();
-	expect(response.content.length).toBeGreaterThan(0);
+  expect(response.stopReason).not.toBe("error");
+  expect(response.errorMessage).toBeFalsy();
+  expect(response.content.length).toBeGreaterThan(0);
 }
 
 describe("AI Providers Unicode Surrogate Pair Tests", () => {

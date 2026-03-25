@@ -9,34 +9,36 @@ import type { Tool, ToolCall } from "../types.js";
 
 // Detect if we're in a browser extension environment with strict CSP
 // Chrome extensions with Manifest V3 don't allow eval/Function constructor
-const isBrowserExtension = typeof globalThis !== "undefined" && (globalThis as any).chrome?.runtime?.id !== undefined;
+const isBrowserExtension =
+  typeof globalThis !== "undefined" &&
+  (globalThis as any).chrome?.runtime?.id !== undefined;
 
 function canUseRuntimeCodegen(): boolean {
-	if (isBrowserExtension) {
-		return false;
-	}
+  if (isBrowserExtension) {
+    return false;
+  }
 
-	try {
-		new Function("return true;");
-		return true;
-	} catch {
-		return false;
-	}
+  try {
+    new Function("return true;");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Create a singleton AJV instance with formats only when runtime code generation is available.
 let ajv: any = null;
 if (canUseRuntimeCodegen()) {
-	try {
-		ajv = new Ajv({
-			allErrors: true,
-			strict: false,
-			coerceTypes: true,
-		});
-		addFormats(ajv);
-	} catch (_e) {
-		console.warn("AJV validation disabled due to CSP restrictions");
-	}
+  try {
+    ajv = new Ajv({
+      allErrors: true,
+      strict: false,
+      coerceTypes: true,
+    });
+    addFormats(ajv);
+  } catch (_e) {
+    console.warn("AJV validation disabled due to CSP restrictions");
+  }
 }
 
 /**
@@ -47,11 +49,11 @@ if (canUseRuntimeCodegen()) {
  * @throws Error if tool is not found or validation fails
  */
 export function validateToolCall(tools: Tool[], toolCall: ToolCall): any {
-	const tool = tools.find((t) => t.name === toolCall.name);
-	if (!tool) {
-		throw new Error(`Tool "${toolCall.name}" not found`);
-	}
-	return validateToolArguments(tool, toolCall);
+  const tool = tools.find((t) => t.name === toolCall.name);
+  if (!tool) {
+    throw new Error(`Tool "${toolCall.name}" not found`);
+  }
+  return validateToolArguments(tool, toolCall);
 }
 
 /**
@@ -62,32 +64,34 @@ export function validateToolCall(tools: Tool[], toolCall: ToolCall): any {
  * @throws Error with formatted message if validation fails
  */
 export function validateToolArguments(tool: Tool, toolCall: ToolCall): any {
-	// Skip validation in environments where runtime code generation is unavailable.
-	if (!ajv || !canUseRuntimeCodegen()) {
-		return toolCall.arguments;
-	}
+  // Skip validation in environments where runtime code generation is unavailable.
+  if (!ajv || !canUseRuntimeCodegen()) {
+    return toolCall.arguments;
+  }
 
-	// Compile the schema.
-	const validate = ajv.compile(tool.parameters);
+  // Compile the schema.
+  const validate = ajv.compile(tool.parameters);
 
-	// Clone arguments so AJV can safely mutate for type coercion
-	const args = structuredClone(toolCall.arguments);
+  // Clone arguments so AJV can safely mutate for type coercion
+  const args = structuredClone(toolCall.arguments);
 
-	// Validate the arguments (AJV mutates args in-place for type coercion)
-	if (validate(args)) {
-		return args;
-	}
+  // Validate the arguments (AJV mutates args in-place for type coercion)
+  if (validate(args)) {
+    return args;
+  }
 
-	// Format validation errors nicely
-	const errors =
-		validate.errors
-			?.map((err: any) => {
-				const path = err.instancePath ? err.instancePath.substring(1) : err.params.missingProperty || "root";
-				return `  - ${path}: ${err.message}`;
-			})
-			.join("\n") || "Unknown validation error";
+  // Format validation errors nicely
+  const errors =
+    validate.errors
+      ?.map((err: any) => {
+        const path = err.instancePath
+          ? err.instancePath.substring(1)
+          : err.params.missingProperty || "root";
+        return `  - ${path}: ${err.message}`;
+      })
+      .join("\n") || "Unknown validation error";
 
-	const errorMessage = `Validation failed for tool "${toolCall.name}":\n${errors}\n\nReceived arguments:\n${JSON.stringify(toolCall.arguments, null, 2)}`;
+  const errorMessage = `Validation failed for tool "${toolCall.name}":\n${errors}\n\nReceived arguments:\n${JSON.stringify(toolCall.arguments, null, 2)}`;
 
-	throw new Error(errorMessage);
+  throw new Error(errorMessage);
 }

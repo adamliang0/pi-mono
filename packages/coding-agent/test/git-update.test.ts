@@ -8,7 +8,13 @@
 
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -17,14 +23,14 @@ import { SettingsManager } from "../src/core/settings-manager.js";
 
 // Helper to run git commands in a directory
 function git(args: string[], cwd: string): string {
-	const result = spawnSync("git", args, {
-		cwd,
-		encoding: "utf-8",
-	});
-	if (result.status !== 0) {
-		throw new Error(`Command failed: git ${args.join(" ")}\n${result.stderr}`);
-	}
-	return result.stdout.trim();
+  const result = spawnSync("git", args, {
+    cwd,
+    encoding: "utf-8",
+  });
+  if (result.status !== 0) {
+    throw new Error(`Command failed: git ${args.join(" ")}\n${result.stderr}`);
+  }
+  return result.stdout.trim();
 }
 
 function initGitRepo(repoDir: string): void {
@@ -34,21 +40,26 @@ function initGitRepo(repoDir: string): void {
 }
 
 // Helper to create a commit with a file
-function createCommit(repoDir: string, filename: string, content: string, message: string): string {
-	writeFileSync(join(repoDir, filename), content);
-	git(["add", filename], repoDir);
-	git(["commit", "-m", message], repoDir);
-	return git(["rev-parse", "HEAD"], repoDir);
+function createCommit(
+  repoDir: string,
+  filename: string,
+  content: string,
+  message: string,
+): string {
+  writeFileSync(join(repoDir, filename), content);
+  git(["add", filename], repoDir);
+  git(["commit", "-m", message], repoDir);
+  return git(["rev-parse", "HEAD"], repoDir);
 }
 
 // Helper to get current commit hash
 function getCurrentCommit(repoDir: string): string {
-	return git(["rev-parse", "HEAD"], repoDir);
+  return git(["rev-parse", "HEAD"], repoDir);
 }
 
 // Helper to get file content
 function getFileContent(repoDir: string, filename: string): string {
-	return readFileSync(join(repoDir, filename), "utf-8");
+  return readFileSync(join(repoDir, filename), "utf-8");
 }
 
 describe("DefaultPackageManager git update", () => {

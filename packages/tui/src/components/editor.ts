@@ -2,10 +2,25 @@ import type { AutocompleteProvider, AutocompleteSuggestions, CombinedAutocomplet
 import { getKeybindings } from "../keybindings.js";
 import { decodeKittyPrintable, matchesKey } from "../keys.js";
 import { KillRing } from "../kill-ring.js";
-import { type Component, CURSOR_MARKER, type Focusable, type TUI } from "../tui.js";
+import {
+  type Component,
+  CURSOR_MARKER,
+  type Focusable,
+  type TUI,
+} from "../tui.js";
 import { UndoStack } from "../undo-stack.js";
-import { getSegmenter, isPunctuationChar, isWhitespaceChar, truncateToWidth, visibleWidth } from "../utils.js";
-import { SelectList, type SelectListLayoutOptions, type SelectListTheme } from "./select-list.js";
+import {
+  getSegmenter,
+  isPunctuationChar,
+  isWhitespaceChar,
+  truncateToWidth,
+  visibleWidth,
+} from "../utils.js";
+import {
+  SelectList,
+  type SelectListLayoutOptions,
+  type SelectListTheme,
+} from "./select-list.js";
 
 const baseSegmenter = getSegmenter();
 
@@ -17,7 +32,7 @@ const PASTE_MARKER_SINGLE = /^\[paste #(\d+)( (\+\d+ lines|\d+ chars))?\]$/;
 
 /** Check if a segment is a paste marker (i.e. was merged by segmentWithMarkers). */
 function isPasteMarker(segment: string): boolean {
-	return segment.length >= 10 && PASTE_MARKER_SINGLE.test(segment);
+  return segment.length >= 10 && PASTE_MARKER_SINGLE.test(segment);
 }
 
 /**
@@ -27,54 +42,57 @@ function isPasteMarker(segment: string): boolean {
  *
  * Only markers whose numeric ID exists in `validIds` are merged.
  */
-function segmentWithMarkers(text: string, validIds: Set<number>): Iterable<Intl.SegmentData> {
-	// Fast path: no paste markers in the text or no valid IDs.
-	if (validIds.size === 0 || !text.includes("[paste #")) {
-		return baseSegmenter.segment(text);
-	}
+function segmentWithMarkers(
+  text: string,
+  validIds: Set<number>,
+): Iterable<Intl.SegmentData> {
+  // Fast path: no paste markers in the text or no valid IDs.
+  if (validIds.size === 0 || !text.includes("[paste #")) {
+    return baseSegmenter.segment(text);
+  }
 
-	// Find all marker spans with valid IDs.
-	const markers: Array<{ start: number; end: number }> = [];
-	for (const m of text.matchAll(PASTE_MARKER_REGEX)) {
-		const id = Number.parseInt(m[1]!, 10);
-		if (!validIds.has(id)) continue;
-		markers.push({ start: m.index, end: m.index + m[0].length });
-	}
-	if (markers.length === 0) {
-		return baseSegmenter.segment(text);
-	}
+  // Find all marker spans with valid IDs.
+  const markers: Array<{ start: number; end: number }> = [];
+  for (const m of text.matchAll(PASTE_MARKER_REGEX)) {
+    const id = Number.parseInt(m[1]!, 10);
+    if (!validIds.has(id)) continue;
+    markers.push({ start: m.index, end: m.index + m[0].length });
+  }
+  if (markers.length === 0) {
+    return baseSegmenter.segment(text);
+  }
 
-	// Build merged segment list.
-	const baseSegments = baseSegmenter.segment(text);
-	const result: Intl.SegmentData[] = [];
-	let markerIdx = 0;
+  // Build merged segment list.
+  const baseSegments = baseSegmenter.segment(text);
+  const result: Intl.SegmentData[] = [];
+  let markerIdx = 0;
 
-	for (const seg of baseSegments) {
-		// Skip past markers that are entirely before this segment.
-		while (markerIdx < markers.length && markers[markerIdx]!.end <= seg.index) {
-			markerIdx++;
-		}
+  for (const seg of baseSegments) {
+    // Skip past markers that are entirely before this segment.
+    while (markerIdx < markers.length && markers[markerIdx]!.end <= seg.index) {
+      markerIdx++;
+    }
 
-		const marker = markerIdx < markers.length ? markers[markerIdx]! : null;
+    const marker = markerIdx < markers.length ? markers[markerIdx]! : null;
 
-		if (marker && seg.index >= marker.start && seg.index < marker.end) {
-			// This segment falls inside a marker.
-			// If this is the first segment of the marker, emit a merged segment.
-			if (seg.index === marker.start) {
-				const markerText = text.slice(marker.start, marker.end);
-				result.push({
-					segment: markerText,
-					index: marker.start,
-					input: text,
-				});
-			}
-			// Otherwise skip (already merged into the first segment).
-		} else {
-			result.push(seg);
-		}
-	}
+    if (marker && seg.index >= marker.start && seg.index < marker.end) {
+      // This segment falls inside a marker.
+      // If this is the first segment of the marker, emit a merged segment.
+      if (seg.index === marker.start) {
+        const markerText = text.slice(marker.start, marker.end);
+        result.push({
+          segment: markerText,
+          index: marker.start,
+          input: text,
+        });
+      }
+      // Otherwise skip (already merged into the first segment).
+    } else {
+      result.push(seg);
+    }
+  }
 
-	return result;
+  return result;
 }
 
 /**
@@ -82,9 +100,9 @@ function segmentWithMarkers(text: string, validIds: Set<number>): Iterable<Intl.
  * Tracks both the text content and its position in the original line.
  */
 export interface TextChunk {
-	text: string;
-	startIndex: number;
-	endIndex: number;
+  text: string;
+  startIndex: number;
+  endIndex: number;
 }
 
 /**
@@ -98,118 +116,145 @@ export interface TextChunk {
  *                       When omitted the default Intl.Segmenter is used.
  * @returns Array of chunks with text and position information
  */
-export function wordWrapLine(line: string, maxWidth: number, preSegmented?: Intl.SegmentData[]): TextChunk[] {
-	if (!line || maxWidth <= 0) {
-		return [{ text: "", startIndex: 0, endIndex: 0 }];
-	}
+export function wordWrapLine(
+  line: string,
+  maxWidth: number,
+  preSegmented?: Intl.SegmentData[],
+): TextChunk[] {
+  if (!line || maxWidth <= 0) {
+    return [{ text: "", startIndex: 0, endIndex: 0 }];
+  }
 
-	const lineWidth = visibleWidth(line);
-	if (lineWidth <= maxWidth) {
-		return [{ text: line, startIndex: 0, endIndex: line.length }];
-	}
+  const lineWidth = visibleWidth(line);
+  if (lineWidth <= maxWidth) {
+    return [{ text: line, startIndex: 0, endIndex: line.length }];
+  }
 
-	const chunks: TextChunk[] = [];
-	const segments = preSegmented ?? [...baseSegmenter.segment(line)];
+  const chunks: TextChunk[] = [];
+  const segments = preSegmented ?? [...baseSegmenter.segment(line)];
 
-	let currentWidth = 0;
-	let chunkStart = 0;
+  let currentWidth = 0;
+  let chunkStart = 0;
 
-	// Wrap opportunity: the position after the last whitespace before a non-whitespace
-	// grapheme, i.e. where a line break is allowed.
-	let wrapOppIndex = -1;
-	let wrapOppWidth = 0;
+  // Wrap opportunity: the position after the last whitespace before a non-whitespace
+  // grapheme, i.e. where a line break is allowed.
+  let wrapOppIndex = -1;
+  let wrapOppWidth = 0;
 
-	for (let i = 0; i < segments.length; i++) {
-		const seg = segments[i]!;
-		const grapheme = seg.segment;
-		const gWidth = visibleWidth(grapheme);
-		const charIndex = seg.index;
-		const isWs = !isPasteMarker(grapheme) && isWhitespaceChar(grapheme);
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i]!;
+    const grapheme = seg.segment;
+    const gWidth = visibleWidth(grapheme);
+    const charIndex = seg.index;
+    const isWs = !isPasteMarker(grapheme) && isWhitespaceChar(grapheme);
 
-		// Overflow check before advancing.
-		if (currentWidth + gWidth > maxWidth) {
-			if (wrapOppIndex >= 0 && currentWidth - wrapOppWidth + gWidth <= maxWidth) {
-				// Backtrack to last wrap opportunity (the remaining content
-				// plus the current grapheme still fits within maxWidth).
-				chunks.push({ text: line.slice(chunkStart, wrapOppIndex), startIndex: chunkStart, endIndex: wrapOppIndex });
-				chunkStart = wrapOppIndex;
-				currentWidth -= wrapOppWidth;
-			} else if (chunkStart < charIndex) {
-				// No viable wrap opportunity: force-break at current position.
-				// This also handles the case where backtracking to a word
-				// boundary wouldn't help because the remaining content plus
-				// the current grapheme (e.g. a wide character) still exceeds
-				// maxWidth.
-				chunks.push({ text: line.slice(chunkStart, charIndex), startIndex: chunkStart, endIndex: charIndex });
-				chunkStart = charIndex;
-				currentWidth = 0;
-			}
-			wrapOppIndex = -1;
-		}
+    // Overflow check before advancing.
+    if (currentWidth + gWidth > maxWidth) {
+      if (
+        wrapOppIndex >= 0 &&
+        currentWidth - wrapOppWidth + gWidth <= maxWidth
+      ) {
+        // Backtrack to last wrap opportunity (the remaining content
+        // plus the current grapheme still fits within maxWidth).
+        chunks.push({
+          text: line.slice(chunkStart, wrapOppIndex),
+          startIndex: chunkStart,
+          endIndex: wrapOppIndex,
+        });
+        chunkStart = wrapOppIndex;
+        currentWidth -= wrapOppWidth;
+      } else if (chunkStart < charIndex) {
+        // No viable wrap opportunity: force-break at current position.
+        // This also handles the case where backtracking to a word
+        // boundary wouldn't help because the remaining content plus
+        // the current grapheme (e.g. a wide character) still exceeds
+        // maxWidth.
+        chunks.push({
+          text: line.slice(chunkStart, charIndex),
+          startIndex: chunkStart,
+          endIndex: charIndex,
+        });
+        chunkStart = charIndex;
+        currentWidth = 0;
+      }
+      wrapOppIndex = -1;
+    }
 
-		if (gWidth > maxWidth) {
-			// Single atomic segment wider than maxWidth (e.g. paste marker
-			// in a narrow terminal). Re-wrap it at grapheme granularity.
+    if (gWidth > maxWidth) {
+      // Single atomic segment wider than maxWidth (e.g. paste marker
+      // in a narrow terminal). Re-wrap it at grapheme granularity.
 
-			// The segment remains logically atomic for cursor
-			// movement / editing — the split is purely visual for word-wrap layout.
-			const subChunks = wordWrapLine(grapheme, maxWidth);
-			for (let j = 0; j < subChunks.length - 1; j++) {
-				const sc = subChunks[j]!;
-				chunks.push({ text: sc.text, startIndex: charIndex + sc.startIndex, endIndex: charIndex + sc.endIndex });
-			}
-			const last = subChunks[subChunks.length - 1]!;
-			chunkStart = charIndex + last.startIndex;
-			currentWidth = visibleWidth(last.text);
-			wrapOppIndex = -1;
-			continue;
-		}
+      // The segment remains logically atomic for cursor
+      // movement / editing — the split is purely visual for word-wrap layout.
+      const subChunks = wordWrapLine(grapheme, maxWidth);
+      for (let j = 0; j < subChunks.length - 1; j++) {
+        const sc = subChunks[j]!;
+        chunks.push({
+          text: sc.text,
+          startIndex: charIndex + sc.startIndex,
+          endIndex: charIndex + sc.endIndex,
+        });
+      }
+      const last = subChunks[subChunks.length - 1]!;
+      chunkStart = charIndex + last.startIndex;
+      currentWidth = visibleWidth(last.text);
+      wrapOppIndex = -1;
+      continue;
+    }
 
-		// Advance.
-		currentWidth += gWidth;
+    // Advance.
+    currentWidth += gWidth;
 
-		// Record wrap opportunity: whitespace followed by non-whitespace.
-		// Multiple spaces join (no break between them); the break point is
-		// after the last space before the next word.
-		const next = segments[i + 1];
-		if (isWs && next && (isPasteMarker(next.segment) || !isWhitespaceChar(next.segment))) {
-			wrapOppIndex = next.index;
-			wrapOppWidth = currentWidth;
-		}
-	}
+    // Record wrap opportunity: whitespace followed by non-whitespace.
+    // Multiple spaces join (no break between them); the break point is
+    // after the last space before the next word.
+    const next = segments[i + 1];
+    if (
+      isWs &&
+      next &&
+      (isPasteMarker(next.segment) || !isWhitespaceChar(next.segment))
+    ) {
+      wrapOppIndex = next.index;
+      wrapOppWidth = currentWidth;
+    }
+  }
 
-	// Push final chunk.
-	chunks.push({ text: line.slice(chunkStart), startIndex: chunkStart, endIndex: line.length });
+  // Push final chunk.
+  chunks.push({
+    text: line.slice(chunkStart),
+    startIndex: chunkStart,
+    endIndex: line.length,
+  });
 
-	return chunks;
+  return chunks;
 }
 
 // Kitty CSI-u sequences for printable keys, including optional shifted/base codepoints.
 interface EditorState {
-	lines: string[];
-	cursorLine: number;
-	cursorCol: number;
+  lines: string[];
+  cursorLine: number;
+  cursorCol: number;
 }
 
 interface LayoutLine {
-	text: string;
-	hasCursor: boolean;
-	cursorPos?: number;
+  text: string;
+  hasCursor: boolean;
+  cursorPos?: number;
 }
 
 export interface EditorTheme {
-	borderColor: (str: string) => string;
-	selectList: SelectListTheme;
+  borderColor: (str: string) => string;
+  selectList: SelectListTheme;
 }
 
 export interface EditorOptions {
-	paddingX?: number;
-	autocompleteMaxVisible?: number;
+  paddingX?: number;
+  autocompleteMaxVisible?: number;
 }
 
 const SLASH_COMMAND_SELECT_LIST_LAYOUT: SelectListLayoutOptions = {
-	minPrimaryColumnWidth: 12,
-	maxPrimaryColumnWidth: 32,
+  minPrimaryColumnWidth: 12,
+  maxPrimaryColumnWidth: 32,
 };
 
 const ATTACHMENT_AUTOCOMPLETE_DEBOUNCE_MS = 20;
