@@ -25,6 +25,12 @@ packages/*/dist-firefox/
 coverage/
 .nyc_output/
 .pi_config/
+
+# mise generated
+bin/
+
+# Built binaries
+packages/coding-agent/binaries/
 tui-debug.log
 compaction-results/
 .opencode/

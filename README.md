@@ -57,6 +57,32 @@ npm run check        # Lint, format, and type check
 
 > **Note:** `npm run check` requires `npm run build` to be run first. The web-ui package uses `tsc` which needs compiled `.d.ts` files from dependencies.
 
+## Using with mise
+
+For managing pi via [mise](https://mise.jdx.dev):
+
+```bash
+# Install mise if you haven't already
+curl https://mise.run | sh
+
+# Build the binary and create a bin/ symlink
+mise run link-bin
+
+# Use pi directly (from the repo directory)
+./bin/pi "Hello, world!"
+
+# Or run via mise exec (works from any directory with this mise.toml)
+mise exec -- ./bin/pi -- "Hello, world!"
+```
+
+For CI/CD that publishes to GitHub releases, the workflow in `.github/workflows/build-binaries.yml` handles building and releasing. After publishing, users can install via:
+
+```bash
+mise use -g pi@x.x.x  # from GitHub releases
+```
+
+This repo's `mise.toml` uses a local path for development. Update it to point to the GitHub backend if you want mise to fetch releases automatically.
+
 ## License
 
 MIT

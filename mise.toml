@@ -1,0 +1,30 @@
+# mise configuration for pi-mono
+# See https://mise.jdx.dev for documentation
+
+[tasks]
+# Build all packages
+build = "bun run build"
+
+# Type check, lint, format
+check = "npm run build && npm run check"
+
+# Run tests
+test = "./test.sh"
+
+# Build binary for current platform and copy assets
+# After running this, run with: mise exec -- bin/pi -- ...
+install-pi = "bash scripts/install-pi.sh"
+
+# Create a bin directory with platform-specific symlink for mise
+link-bin = { depends = ["install-pi"], run = '''
+    PLATFORM=$(./scripts/install-pi.sh --detect-only 2>/dev/null || node -e "const p=require('os').platform(); console.log(p==='darwin'?'darwin-'+(require('os').arch()==='arm64'?'arm64':'x64'):p==='win32'?'windows-x64':'linux-x64')")
+    mkdir -p bin
+    if [[ "$PLATFORM" == windows-x64 ]]; then
+        ln -sf "$(pwd)/packages/coding-agent/binaries/$PLATFORM/pi.exe" "bin/pi.exe"
+    else
+        ln -sf "$(pwd)/packages/coding-agent/binaries/$PLATFORM/pi" bin/pi
+    fi
+'''}
+
+[tools]
+bun = "latest"

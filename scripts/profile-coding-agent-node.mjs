@@ -281,27 +281,12 @@ async function waitForExit(child, errorPrefix) {
 async function runBuild() {
 	process.stdout.write("Building packages/tui, packages/ai, packages/agent, and packages/coding-agent...\n");
 	const startedAt = performance.now();
-	const child = spawn(
-		"npm",
-		[
-			"run",
-			"build",
-			"--workspace",
-			"packages/tui",
-			"--workspace",
-			"packages/ai",
-			"--workspace",
-			"packages/agent",
-			"--workspace",
-			"packages/coding-agent",
-		],
-		{
-			cwd: repoRoot,
-			env: process.env,
-			stdio: ["ignore", "pipe", "pipe"],
-			shell: process.platform === "win32",
-		},
-	);
+	const child = spawn("bun", ["run", "build"], {
+		cwd: packageDir,
+		env: process.env,
+		stdio: ["ignore", "pipe", "pipe"],
+		shell: process.platform === "win32",
+	});
 
 	let stdout = "";
 	let stderr = "";
