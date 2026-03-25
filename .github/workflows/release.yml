@@ -1,0 +1,175 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  RELEASE_TAG: ${{ github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.1
+        with:
+          bun-version: 1.2.20
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          token: ${{ secrets.NPM_TOKEN }}
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev libpango1.0-dev libjpeg-dev libgif-dev librsvg2-dev fd-find ripgrep
+          sudo ln -s $(which fdfind) /usr/local/bin/fd
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install npm dependencies
+        run: npm install
+
+      # Extract version from tag
+      - name: Set version
+        id: version
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "::notice::Releasing v$VERSION"
+
+      # Verify version matches package.json
+      - name: Verify version
+        run: |
+          PKG_VERSION=$(node -p "require('./packages/ai/package.json').version")
+          if [ "$PKG_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::Version mismatch: tag is ${{ steps.version.outputs.version }}, package.json is $PKG_VERSION"
+            exit 1
+          fi
+
+      # Update changelogs (replace [Unreleased] with [version] - date)
+      - name: Update changelogs
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          for changelog in packages/*/CHANGELOG.md; do
+            if grep -q "## \[Unreleased\]" "$changelog"; then
+              sed -i "s/## \[Unreleased\]/## [$VERSION] - $DATE/" "$changelog"
+              echo "Updated $changelog"
+            fi
+          done
+
+      # Commit changelog updates
+      - name: Commit changelog updates
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add packages/*/CHANGELOG.md
+          git diff --cached --quiet || git commit -m "chore: update changelogs for v${{ steps.version.outputs.version }}"
+          git push
+
+      # Publish to npm
+      - name: Publish to npm
+        run: bun run publish
+
+      # Add [Unreleased] section back for next release
+      - name: Add Unreleased section
+        run: |
+          for changelog in packages/*/CHANGELOG.md; do
+            if ! grep -q "## \[Unreleased\]" "$changelog"; then
+              sed -i '1s/^/# Changelog\n\n## [Unreleased]\n\n/' "$changelog"
+              echo "Added [Unreleased] to $changelog"
+            fi
+          done
+          git add packages/*/CHANGELOG.md
+          git commit -m "chore: add [Unreleased] section for next cycle" || true
+          git push || true
+
+  build-binaries:
+    needs: release
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@4bc047ad259df6fc24a6c9b0f9a0cb08cf17fbe5 # v2.0.1
+        with:
+          bun-version: 1.2.20
+          cache: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Build binaries
+        run: ./scripts/build-binaries.sh
+
+      - name: Extract changelog for release
+        id: changelog
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          
+          # Extract changelog section for this version
+          cd packages/coding-agent
+          if [ -f CHANGELOG.md ]; then
+            awk "/^## \[${VERSION}\]/{flag=1; next} /^## \[/{flag=0} flag" CHANGELOG.md > /tmp/release-notes.md || true
+          fi
+          
+          # If empty, use a default message
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "Release ${VERSION}" > /tmp/release-notes.md
+          fi
+          
+          cat /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd packages/coding-agent/binaries
+          
+          # Check if release exists
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists, uploading binaries..."
+            gh release upload "${RELEASE_TAG}" \
+              pi-darwin-arm64.tar.gz \
+              pi-darwin-x64.tar.gz \
+              pi-linux-x64.tar.gz \
+              pi-linux-arm64.tar.gz \
+              pi-windows-x64.zip \
+              --clobber
+          else
+            echo "Creating new release ${RELEASE_TAG}..."
+            gh release create "${RELEASE_TAG}" \
+              --title "${RELEASE_TAG}" \
+              --notes-file /tmp/release-notes.md \
+              pi-darwin-arm64.tar.gz \
+              pi-darwin-x64.tar.gz \
+              pi-linux-x64.tar.gz \
+              pi-linux-arm64.tar.gz \
+              pi-windows-x64.zip
+          fi
+
+          echo "::notice::Release ${RELEASE_TAG} created with binaries"

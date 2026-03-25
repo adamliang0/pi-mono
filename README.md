@@ -83,6 +83,35 @@ mise use -g pi@x.x.x  # from GitHub releases
 
 This repo's `mise.toml` uses a local path for development. Update it to point to the GitHub backend if you want mise to fetch releases automatically.
 
+## Releasing
+
+Releases are automated via GitHub Actions. To release a new version:
+
+```bash
+# Bump version (updates package.json files, adds [Unreleased] section)
+bun run release:patch  # or release:minor, release:major
+
+# This will:
+# 1. Update all package versions
+# 2. Commit and create a version tag (e.g., v0.63.0)
+# 3. Push to origin
+```
+
+The `release.yml` workflow then automatically:
+1. Publishes all packages to npm
+2. Builds binaries for all platforms (macOS, Linux, Windows)
+3. Creates a GitHub release with binaries and changelog
+
+### Manual Release (if needed)
+
+```bash
+# 1. Update CHANGELOG.md files with [Unreleased] changes
+# 2. Manually trigger release.yml from GitHub Actions UI
+# 3. Or run locally:
+git tag v0.x.x
+git push origin v0.x.x
+```
+
 ## License
 
 MIT
