@@ -16,7 +16,7 @@
         "dev": "concurrently --names \"ai,agent,coding-agent,mom,web-ui,tui\" --prefix-colors \"cyan,yellow,red,white,green,magenta\" \"cd packages/ai && bun run dev\" \"cd packages/agent && bun run dev\" \"cd packages/coding-agent && bun run dev\" \"cd packages/mom && bun run dev\" \"cd packages/web-ui && bun run dev\" \"cd packages/tui && bun run dev\"",
         "dev:tsc": "concurrently --names \"ai,web-ui\" --prefix-colors \"cyan,green\" \"cd packages/ai && bun run dev:tsc\" \"cd packages/web-ui && bun run dev:tsc\"",
         "check": "biome check --write --error-on-warnings . && tsgo --noEmit && bun run check:browser-smoke && cd packages/web-ui && bun run check",
-        "check:browser-smoke": "node scripts/check-browser-smoke.mjs",
+        "check:browser-smoke": "bun scripts/check-browser-smoke.mjs",
         "profile:tui": "node scripts/profile-coding-agent-node.mjs --mode tui",
         "profile:rpc": "node scripts/profile-coding-agent-node.mjs --mode rpc",
         "test": "bun run test --workspaces --if-present",
@@ -33,14 +33,15 @@
         "prepare": "husky"
     },
     "devDependencies": {
-        "@biomejs/biome": "2.3.5",
-        "@types/node": "^22.10.5",
-        "@typescript/native-preview": "7.0.0-dev.20260120.1",
+        "@biomejs/biome": "2.4.8",
+        "@types/node": "^25.5.0",
+        "@typescript/native-preview": "7.0.0-dev.20260324.1",
         "concurrently": "^9.2.1",
+        "esbuild": "^0.27.4",
         "husky": "^9.1.7",
-        "tsx": "^4.20.3",
-        "typescript": "^5.9.2",
-        "shx": "^0.4.0"
+        "shx": "^0.4.0",
+        "tsx": "^4.21.0",
+        "typescript": "^6.0.2"
     },
     "engines": {
         "node": ">=20.0.0"
@@ -50,6 +51,6 @@
     "dependencies": {
         "@mariozechner/jiti": "^2.6.5",
         "@mariozechner/pi-coding-agent": "workspace:*",
-        "get-east-asian-width": "^1.4.0"
+        "get-east-asian-width": "^1.5.0"
     }
 }
