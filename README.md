@@ -23,6 +23,8 @@ OSS weekend runs Sunday, March 22, 2026 through Monday, March 30, 2026. New issu
   <a href="https://exe.dev"><img src="packages/coding-agent/docs/images/exy.png" alt="Exy mascot" width="48" /><br />exe.dev</a>
 </p>
 
+> **Fork of [pi-mono](https://github.com/badlogic/pi-mono)** with opinionated workspace changes (turborepo, bun, automated releases).
+
 ## Pi Monorepo
 
 > **Looking for the pi coding agent?** See **[packages/coding-agent](packages/coding-agent)** for installation and usage.
