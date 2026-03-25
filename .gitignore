@@ -31,6 +31,9 @@ bin/
 
 # Built binaries
 packages/coding-agent/binaries/
+
+# Turbo cache
+.turbo/
 tui-debug.log
 compaction-results/
 .opencode/

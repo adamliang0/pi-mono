@@ -44,12 +44,12 @@ export interface Keybindings {
 export type Keybinding = keyof Keybindings;
 
 export interface KeybindingDefinition {
-  defaultKeys: KeyId | KeyId[];
+  defaultKeys: KeyId | readonly KeyId[];
   description?: string;
 }
 
 export type KeybindingDefinitions = Record<string, KeybindingDefinition>;
-export type KeybindingsConfig = Record<string, KeyId | KeyId[] | undefined>;
+export type KeybindingsConfig = Record<string, KeyId | readonly KeyId[] | undefined>;
 
 export const TUI_KEYBINDINGS = {
   "tui.editor.cursorUp": { defaultKeys: "up", description: "Move cursor up" },
@@ -153,7 +153,7 @@ export interface KeybindingConflict {
   keybindings: string[];
 }
 
-function normalizeKeys(keys: KeyId | KeyId[] | undefined): KeyId[] {
+function normalizeKeys(keys: KeyId | readonly KeyId[] | undefined): KeyId[] {
   if (keys === undefined) return [];
   const keyList = Array.isArray(keys) ? keys : [keys];
   const seen = new Set<KeyId>();
