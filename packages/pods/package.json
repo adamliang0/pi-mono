@@ -1,6 +1,6 @@
 {
 	"name": "@adamliang0/pi",
-	"version": "0.62.0",
+	"version": "0.63.0",
 	"description": "CLI tool for managing vLLM deployments on GPU pods",
 	"type": "module",
 	"bin": {

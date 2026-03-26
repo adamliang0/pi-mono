@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-03-26
+
+### Added
+
+- Fork release setup for adamliang0/pi-mono
+
 ### Added
 
 - Added `sessionDir` setting support in global and project `settings.json` so session storage can be configured without passing `--session-dir` on every invocation ([#2598](https://github.com/badlogic/pi-mono/pull/2598) by [@smcllns](https://github.com/smcllns))
