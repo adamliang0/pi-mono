@@ -239,25 +239,26 @@ export const streamGoogle: StreamFunction<
           }
         }
 
-				if (chunk.usageMetadata) {
-					output.usage = {
-						input: chunk.usageMetadata.promptTokenCount || 0,
-						output:
-							(chunk.usageMetadata.candidatesTokenCount || 0) + (chunk.usageMetadata.thoughtsTokenCount || 0),
-						cacheRead: chunk.usageMetadata.cachedContentTokenCount || 0,
-						cacheWrite: 0,
-						totalTokens: chunk.usageMetadata.totalTokenCount || 0,
-						cost: {
-							input: 0,
-							output: 0,
-							cacheRead: 0,
-							cacheWrite: 0,
-							total: 0,
-						},
-					};
-					calculateCost(model, output.usage);
-				}
-			}
+        if (chunk.usageMetadata) {
+          output.usage = {
+            input: chunk.usageMetadata.promptTokenCount || 0,
+            output:
+              (chunk.usageMetadata.candidatesTokenCount || 0) +
+              (chunk.usageMetadata.thoughtsTokenCount || 0),
+            cacheRead: chunk.usageMetadata.cachedContentTokenCount || 0,
+            cacheWrite: 0,
+            totalTokens: chunk.usageMetadata.totalTokenCount || 0,
+            cost: {
+              input: 0,
+              output: 0,
+              cacheRead: 0,
+              cacheWrite: 0,
+              total: 0,
+            },
+          };
+          calculateCost(model, output.usage);
+        }
+      }
 
       if (currentBlock) {
         if (currentBlock.type === "text") {

@@ -37,8 +37,8 @@ function applyCompletion(
 }
 
 async function flushAutocomplete(): Promise<void> {
-	await Promise.resolve();
-	await new Promise((resolve) => setImmediate(resolve));
+  await Promise.resolve();
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 describe("Editor component", () => {
@@ -1358,1257 +1358,1276 @@ describe("Editor component", () => {
       assert.strictEqual(editor.getText(), "second");
     });
 
-		it("consecutive deletions across lines coalesce into one entry", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// "1\n2\n3" with cursor at end, delete everything with Ctrl+W
-			editor.setText("1\n2\n3");
-			editor.handleInput("\x17"); // Ctrl+W - deletes "3"
-			assert.strictEqual(editor.getText(), "1\n2\n");
-
-			editor.handleInput("\x17"); // Ctrl+W - deletes newline (merge with prev line)
-			assert.strictEqual(editor.getText(), "1\n2");
-
-			editor.handleInput("\x17"); // Ctrl+W - deletes "2"
-			assert.strictEqual(editor.getText(), "1\n");
-
-			editor.handleInput("\x17"); // Ctrl+W - deletes newline
-			assert.strictEqual(editor.getText(), "1");
-
-			editor.handleInput("\x17"); // Ctrl+W - deletes "1"
-			assert.strictEqual(editor.getText(), "");
-
-			// All deletions should have accumulated into one entry
-			editor.handleInput("\x19"); // Ctrl+Y
-			assert.strictEqual(editor.getText(), "1\n2\n3");
-		});
-
-		it("Ctrl+K at line end deletes newline and coalesces", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// "ab" on line 1, "cd" on line 2, cursor at end of line 1
-			editor.setText("");
-			editor.handleInput("a");
-			editor.handleInput("b");
-			editor.handleInput("\n");
-			editor.handleInput("c");
-			editor.handleInput("d");
-			// Move to end of first line
-			editor.handleInput("\x1b[A"); // Up arrow
-			editor.handleInput("\x05"); // Ctrl+E - end of line
-
-			// Now at end of "ab", Ctrl+K should delete newline (merge with "cd")
-			editor.handleInput("\x0b"); // Ctrl+K - deletes newline
-			assert.strictEqual(editor.getText(), "abcd");
-
-			// Continue deleting
-			editor.handleInput("\x0b"); // Ctrl+K - deletes "cd"
-			assert.strictEqual(editor.getText(), "ab");
-
-			// Both deletions should accumulate
-			editor.handleInput("\x19"); // Ctrl+Y
-			assert.strictEqual(editor.getText(), "ab\ncd");
-		});
-
-		it("handles yank in middle of text", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("word");
-			editor.handleInput("\x17"); // Ctrl+W - deletes "word"
-			editor.setText("hello world");
-
-			// Move to middle (after "hello ")
-			editor.handleInput("\x01"); // Ctrl+A
-			for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C");
-
-			editor.handleInput("\x19"); // Ctrl+Y
-			assert.strictEqual(editor.getText(), "hello wordworld");
-		});
-
-		it("handles yank-pop in middle of text", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Create two kill ring entries
-			editor.setText("FIRST");
-			editor.handleInput("\x17"); // Ctrl+W - deletes "FIRST"
-			editor.setText("SECOND");
-			editor.handleInput("\x17"); // Ctrl+W - deletes "SECOND"
-
-			// Ring: ["FIRST", "SECOND"]
-
-			// Set up "hello world" and position cursor after "hello "
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A - go to start of line
-			for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C"); // Move right 6
-
-			// Yank "SECOND" in the middle
-			editor.handleInput("\x19"); // Ctrl+Y
-			assert.strictEqual(editor.getText(), "hello SECONDworld");
-
-			// Yank-pop replaces "SECOND" with "FIRST"
-			editor.handleInput("\x1by"); // Alt+Y
-			assert.strictEqual(editor.getText(), "hello FIRSTworld");
-		});
-
-		it("multiline yank and yank-pop in middle of text", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Create single-line entry
-			editor.setText("SINGLE");
-			editor.handleInput("\x17"); // Ctrl+W - deletes "SINGLE"
-
-			// Create multiline entry via consecutive Ctrl+U
-			editor.setText("A\nB");
-			editor.handleInput("\x15"); // Ctrl+U - deletes "B"
-			editor.handleInput("\x15"); // Ctrl+U - deletes newline
-			editor.handleInput("\x15"); // Ctrl+U - deletes "A"
-			// Ring: ["SINGLE", "A\nB"]
-
-			// Insert in middle of "hello world"
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A
-			for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C");
-
-			// Yank multiline "A\nB"
-			editor.handleInput("\x19"); // Ctrl+Y
-			assert.strictEqual(editor.getText(), "hello A\nBworld");
-
-			// Yank-pop replaces with "SINGLE"
-			editor.handleInput("\x1by"); // Alt+Y
-			assert.strictEqual(editor.getText(), "hello SINGLEworld");
-		});
-
-		it("Alt+D deletes word forward and saves to kill ring", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("hello world test");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-
-			editor.handleInput("\x1bd"); // Alt+D - deletes "hello"
-			assert.strictEqual(editor.getText(), " world test");
-
-			editor.handleInput("\x1bd"); // Alt+D - deletes " world" (skips whitespace, then word)
-			assert.strictEqual(editor.getText(), " test");
-
-			// Yank should get accumulated text
-			editor.handleInput("\x19"); // Ctrl+Y
-			assert.strictEqual(editor.getText(), "hello world test");
-		});
-
-		it("Alt+D at end of line deletes newline", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("line1\nline2");
-			// Move to start of document, then to end of first line
-			editor.handleInput("\x1b[A"); // Up arrow - go to first line
-			editor.handleInput("\x05"); // Ctrl+E - end of line
-
-			editor.handleInput("\x1bd"); // Alt+D - deletes newline (merges lines)
-			assert.strictEqual(editor.getText(), "line1line2");
-
-			editor.handleInput("\x19"); // Ctrl+Y
-			assert.strictEqual(editor.getText(), "line1\nline2");
-		});
-	});
-
-	describe("Undo", () => {
-		it("does nothing when undo stack is empty", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "");
-		});
-
-		it("coalesces consecutive word characters into one undo unit", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			assert.strictEqual(editor.getText(), "hello world");
-
-			// Undo removes " world" (space captured state before it, so we restore to "hello")
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello");
-
-			// Undo removes "hello"
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "");
-		});
-
-		it("undoes spaces one at a time", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput(" ");
-			assert.strictEqual(editor.getText(), "hello  ");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo) - removes second " "
-			assert.strictEqual(editor.getText(), "hello ");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo) - removes first " "
-			assert.strictEqual(editor.getText(), "hello");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo) - removes "hello"
-			assert.strictEqual(editor.getText(), "");
-		});
-
-		it("undoes newlines and signals next word to capture state", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput("\n");
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			assert.strictEqual(editor.getText(), "hello\nworld");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello\n");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "");
-		});
-
-		it("undoes backspace", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput("\x7f"); // Backspace
-			assert.strictEqual(editor.getText(), "hell");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello");
-		});
-
-		it("undoes forward delete", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			editor.handleInput("\x1b[C"); // Right arrow
-			editor.handleInput("\x1b[3~"); // Delete key
-			assert.strictEqual(editor.getText(), "hllo");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello");
-		});
-
-		it("undoes Ctrl+W (delete word backward)", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			assert.strictEqual(editor.getText(), "hello world");
-
-			editor.handleInput("\x17"); // Ctrl+W
-			assert.strictEqual(editor.getText(), "hello ");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-		});
-
-		it("undoes Ctrl+K (delete to line end)", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C"); // Move right 6 times
-
-			editor.handleInput("\x0b"); // Ctrl+K
-			assert.strictEqual(editor.getText(), "hello ");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-
-			editor.handleInput("|");
-			assert.strictEqual(editor.getText(), "hello |world");
-		});
-
-		it("undoes Ctrl+U (delete to line start)", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C"); // Move right 6 times
-
-			editor.handleInput("\x15"); // Ctrl+U
-			assert.strictEqual(editor.getText(), "world");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-		});
-
-		it("undoes yank", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput("\x17"); // Ctrl+W - delete "hello "
-			editor.handleInput("\x19"); // Ctrl+Y - yank
-			assert.strictEqual(editor.getText(), "hello ");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "");
-		});
-
-		it("undoes single-line paste atomically", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
-
-			// Simulate bracketed paste of "beep boop"
-			editor.handleInput("\x1b[200~beep boop\x1b[201~");
-			assert.strictEqual(editor.getText(), "hellobeep boop world");
-
-			// Single undo should restore entire pre-paste state
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-
-			editor.handleInput("|");
-			assert.strictEqual(editor.getText(), "hello| world");
-		});
-
-		it("does not trigger autocomplete during single-line paste", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			let suggestionCalls = 0;
-
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async () => {
-					suggestionCalls += 1;
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-			editor.handleInput("\x1b[200~look at @node_modules/react/index.js please\x1b[201~");
-
-			assert.strictEqual(editor.getText(), "look at @node_modules/react/index.js please");
-			assert.strictEqual(suggestionCalls, 0);
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-		});
-
-		it("undoes multi-line paste atomically", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
-
-			// Simulate bracketed paste of multi-line text
-			editor.handleInput("\x1b[200~line1\nline2\nline3\x1b[201~");
-			assert.strictEqual(editor.getText(), "helloline1\nline2\nline3 world");
-
-			// Single undo should restore entire pre-paste state
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-
-			editor.handleInput("|");
-			assert.strictEqual(editor.getText(), "hello| world");
-		});
-
-		it("undoes insertTextAtCursor atomically", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
-
-			// Programmatic insertion (e.g., clipboard image path)
-			editor.insertTextAtCursor("/tmp/image.png");
-			assert.strictEqual(editor.getText(), "hello/tmp/image.png world");
-
-			// Single undo should restore entire pre-insert state
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-
-			editor.handleInput("|");
-			assert.strictEqual(editor.getText(), "hello| world");
-		});
-
-		it("insertTextAtCursor handles multiline text", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
-
-			// Insert multiline text
-			editor.insertTextAtCursor("line1\nline2\nline3");
-			assert.strictEqual(editor.getText(), "helloline1\nline2\nline3 world");
-
-			// Cursor should be at end of inserted text (after "line3", before " world")
-			const cursor = editor.getCursor();
-			assert.strictEqual(cursor.line, 2);
-			assert.strictEqual(cursor.col, 5); // "line3".length
-
-			// Single undo should restore entire pre-insert state
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-		});
-
-		it("insertTextAtCursor normalizes CRLF and CR line endings", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("");
-
-			// Insert text with CRLF
-			editor.insertTextAtCursor("a\r\nb\r\nc");
-			assert.strictEqual(editor.getText(), "a\nb\nc");
-
-			editor.handleInput("\x1b[45;5u"); // Undo
-			assert.strictEqual(editor.getText(), "");
-
-			// Insert text with CR only
-			editor.insertTextAtCursor("x\ry\rz");
-			assert.strictEqual(editor.getText(), "x\ny\nz");
-		});
-
-		it("undoes setText to empty string", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			assert.strictEqual(editor.getText(), "hello world");
-
-			editor.setText("");
-			assert.strictEqual(editor.getText(), "");
-
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-		});
-
-		it("clears undo stack on submit", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			let submitted = "";
-			editor.onSubmit = (text) => {
-				submitted = text;
-			};
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput("\r"); // Enter - submit
-
-			assert.strictEqual(submitted, "hello");
-			assert.strictEqual(editor.getText(), "");
-
-			// Undo should do nothing - stack was cleared
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "");
-		});
-
-		it("exits history browsing mode on undo", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Add "hello" to history
-			editor.addToHistory("hello");
-			assert.strictEqual(editor.getText(), "");
-
-			// Type "world"
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			assert.strictEqual(editor.getText(), "world");
-
-			// Ctrl+W - delete word
-			editor.handleInput("\x17"); // Ctrl+W
-			assert.strictEqual(editor.getText(), "");
-
-			// Press Up - enter history browsing, shows "hello"
-			editor.handleInput("\x1b[A"); // Up arrow
-			assert.strictEqual(editor.getText(), "hello");
-
-			// Undo should restore to "" (state before entering history browsing)
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "");
-
-			// Undo again should restore to "world" (state before Ctrl+W)
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "world");
-		});
-
-		it("undo restores to pre-history state even after multiple history navigations", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Add history entries
-			editor.addToHistory("first");
-			editor.addToHistory("second");
-			editor.addToHistory("third");
-
-			// Type something
-			editor.handleInput("c");
-			editor.handleInput("u");
-			editor.handleInput("r");
-			editor.handleInput("r");
-			editor.handleInput("e");
-			editor.handleInput("n");
-			editor.handleInput("t");
-			assert.strictEqual(editor.getText(), "current");
-
-			// Clear editor
-			editor.handleInput("\x17"); // Ctrl+W
-			assert.strictEqual(editor.getText(), "");
-
-			// Navigate through history multiple times
-			editor.handleInput("\x1b[A"); // Up - "third"
-			assert.strictEqual(editor.getText(), "third");
-			editor.handleInput("\x1b[A"); // Up - "second"
-			assert.strictEqual(editor.getText(), "second");
-			editor.handleInput("\x1b[A"); // Up - "first"
-			assert.strictEqual(editor.getText(), "first");
-
-			// Undo should go back to "" (state before we started browsing), not intermediate states
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "");
-
-			// Another undo goes back to "current"
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "current");
-		});
-
-		it("cursor movement starts new undo unit", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput(" ");
-			editor.handleInput("w");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("l");
-			editor.handleInput("d");
-			assert.strictEqual(editor.getText(), "hello world");
-
-			// Move cursor left 5 (to after "hello ")
-			for (let i = 0; i < 5; i++) editor.handleInput("\x1b[D");
-
-			// Type "lol" in the middle
-			editor.handleInput("l");
-			editor.handleInput("o");
-			editor.handleInput("l");
-			assert.strictEqual(editor.getText(), "hello lolworld");
-
-			// Undo should restore to "hello world" (before inserting "lol")
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello world");
-
-			editor.handleInput("|");
-			assert.strictEqual(editor.getText(), "hello |world");
-		});
-
-		it("no-op delete operations do not push undo snapshots", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.handleInput("h");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput("l");
-			editor.handleInput("o");
-			assert.strictEqual(editor.getText(), "hello");
-
-			// Delete word on empty - multiple times (should be no-ops)
-			editor.handleInput("\x17"); // Ctrl+W - deletes "hello"
-			assert.strictEqual(editor.getText(), "");
-			editor.handleInput("\x17"); // Ctrl+W - no-op (nothing to delete)
-			editor.handleInput("\x17"); // Ctrl+W - no-op
-
-			// Single undo should restore "hello"
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "hello");
-		});
-
-		it("undoes autocomplete", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Create a mock autocomplete provider
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					const text = lines[0] || "";
-					const prefix = text.slice(0, cursorCol);
-					if (prefix === "di") {
-						return {
-							items: [{ value: "dist/", label: "dist/" }],
-							prefix: "di",
-						};
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "di"
-			editor.handleInput("d");
-			editor.handleInput("i");
-			assert.strictEqual(editor.getText(), "di");
-
-			// Press Tab to trigger autocomplete
-			editor.handleInput("\t");
-			await flushAutocomplete();
-			assert.strictEqual(editor.getText(), "dist/");
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-
-			// Undo should restore to "di"
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "di");
-		});
-	});
-
-	describe("Autocomplete", () => {
-		it("auto-applies single force-file suggestion without showing menu", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol, options) => {
-					if (!options.force) {
-						return null;
-					}
-					const text = lines[0] || "";
-					const prefix = text.slice(0, cursorCol);
-					if (prefix === "Work") {
-						return {
-							items: [{ value: "Workspace/", label: "Workspace/" }],
-							prefix: "Work",
-						};
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "Work"
-			editor.handleInput("W");
-			editor.handleInput("o");
-			editor.handleInput("r");
-			editor.handleInput("k");
-			assert.strictEqual(editor.getText(), "Work");
-
-			// Press Tab - should auto-apply without showing menu
-			editor.handleInput("\t");
-			await flushAutocomplete();
-			assert.strictEqual(editor.getText(), "Workspace/");
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-
-			// Undo should restore to "Work"
-			editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
-			assert.strictEqual(editor.getText(), "Work");
-		});
-
-		it("shows menu when force-file has multiple suggestions", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol, options) => {
-					if (!options.force) {
-						return null;
-					}
-					const text = lines[0] || "";
-					const prefix = text.slice(0, cursorCol);
-					if (prefix === "src") {
-						return {
-							items: [
-								{ value: "src/", label: "src/" },
-								{ value: "src.txt", label: "src.txt" },
-							],
-							prefix: "src",
-						};
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "src"
-			editor.handleInput("s");
-			editor.handleInput("r");
-			editor.handleInput("c");
-			assert.strictEqual(editor.getText(), "src");
-
-			// Press Tab - should show menu because there are multiple suggestions
-			editor.handleInput("\t");
-			await flushAutocomplete();
-			assert.strictEqual(editor.getText(), "src");
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Press Tab again to accept first suggestion
-			editor.handleInput("\t");
-			assert.strictEqual(editor.getText(), "src/");
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-		});
-
-		it("keeps suggestions open when typing in force mode (Tab-triggered)", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			const allFiles = [
-				{ value: "readme.md", label: "readme.md" },
-				{ value: "package.json", label: "package.json" },
-				{ value: "src/", label: "src/" },
-				{ value: "dist/", label: "dist/" },
-			];
-
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol, options) => {
-					const text = lines[0] || "";
-					const prefix = text.slice(0, cursorCol);
-					const shouldMatch = options.force || prefix.includes("/") || prefix.startsWith(".");
-					if (!shouldMatch) {
-						return null;
-					}
-					const filtered = allFiles.filter((f) => f.value.toLowerCase().startsWith(prefix.toLowerCase()));
-					if (filtered.length > 0) {
-						return { items: filtered, prefix };
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Press Tab on empty prompt - should show all files (force mode)
-			editor.handleInput("\t");
-			await flushAutocomplete();
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Type "r" - should narrow to "readme.md" (force mode keeps suggestions open)
-			editor.handleInput("r");
-			await flushAutocomplete();
-			assert.strictEqual(editor.getText(), "r");
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Type "e" - should still show "readme.md"
-			editor.handleInput("e");
-			await flushAutocomplete();
-			assert.strictEqual(editor.getText(), "re");
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Accept with Tab
-			editor.handleInput("\t");
-			assert.strictEqual(editor.getText(), "readme.md");
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-		});
-
-		it("debounces @ autocomplete while typing", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			let suggestionCalls = 0;
-
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					suggestionCalls += 1;
-					const text = (lines[0] || "").slice(0, cursorCol);
-					return {
-						items: [{ value: "@main.ts", label: "main.ts" }],
-						prefix: text,
-					};
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			editor.handleInput("@");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			editor.handleInput("m");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			editor.handleInput("a");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-			editor.handleInput("i");
-
-			assert.strictEqual(suggestionCalls, 0);
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-
-			await new Promise((resolve) => setTimeout(resolve, 250));
-			await flushAutocomplete();
-
-			assert.strictEqual(suggestionCalls, 1);
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-		});
-
-		it("aborts active @ autocomplete when typing continues", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			let aborts = 0;
-
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (_lines, _cursorLine, _cursorCol, options) => {
-					return await new Promise((resolve) => {
-						const timeout = setTimeout(() => {
-							resolve({ items: [{ value: "@main.ts", label: "main.ts" }], prefix: "@main" });
-						}, 500);
-						options.signal.addEventListener(
-							"abort",
-							() => {
-								aborts += 1;
-								clearTimeout(timeout);
-								resolve(null);
-							},
-							{ once: true },
-						);
-					});
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			editor.handleInput("@");
-			editor.handleInput("m");
-			editor.handleInput("a");
-			editor.handleInput("i");
-			await new Promise((resolve) => setTimeout(resolve, 250));
-			editor.handleInput("n");
-			await new Promise((resolve) => setTimeout(resolve, 50));
-
-			assert.strictEqual(aborts, 1);
-		});
-
-		it("hides autocomplete when backspacing slash command to empty", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Mock provider with slash commands
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					const text = lines[0] || "";
-					const prefix = text.slice(0, cursorCol);
-					// Only return slash command suggestions when line starts with /
-					if (prefix.startsWith("/")) {
-						const commands = [
-							{ value: "/model", label: "model", description: "Change model" },
-							{ value: "/help", label: "help", description: "Show help" },
-						];
-						const query = prefix.slice(1); // Remove leading /
-						const filtered = commands.filter((c) => c.value.startsWith(query));
-						if (filtered.length > 0) {
-							return { items: filtered, prefix };
-						}
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "/" - should show slash command suggestions
-			editor.handleInput("/");
-			await flushAutocomplete();
-			assert.strictEqual(editor.getText(), "/");
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Backspace to delete "/" - should hide autocomplete completely
-			editor.handleInput("\x7f"); // Backspace
-			await flushAutocomplete();
-			assert.strictEqual(editor.getText(), "");
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-		});
-
-		it("applies exact typed slash-argument value on Enter even when first item is highlighted", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Mock provider for /argtest command with argument completions
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					const text = lines[0] || "";
-					const beforeCursor = text.slice(0, cursorCol);
-
-					// Check if we're in argument completion context: "/argtest <prefix>"
-					const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
-					if (argtestMatch) {
-						const argumentText = argtestMatch[1]!;
-						const allArguments = [
-							{ value: "one", label: "one" },
-							{ value: "two", label: "two" },
-							{ value: "three", label: "three" },
-						];
-						// Return all arguments that start with the typed prefix
-						const filtered = allArguments.filter((arg) => arg.value.startsWith(argumentText));
-						if (filtered.length > 0) {
-							return { items: filtered, prefix: argumentText };
-						}
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "/argtest two"
-			editor.handleInput("/");
-			editor.handleInput("a");
-			editor.handleInput("r");
-			editor.handleInput("g");
-			editor.handleInput("t");
-			editor.handleInput("e");
-			editor.handleInput("s");
-			editor.handleInput("t");
-			editor.handleInput(" ");
-			editor.handleInput("t");
-			editor.handleInput("w");
-			editor.handleInput("o");
-
-			assert.strictEqual(editor.getText(), "/argtest two");
-			await flushAutocomplete();
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Press Enter - should apply the exact typed value "two", not the first item
-			editor.handleInput("\r");
-
-			// The exact typed value "two" should be retained
-			assert.strictEqual(editor.getText(), "/argtest two");
-		});
-
-		it("selects first prefix match on Enter when typed arg is not exact match", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Mock provider for /argtest command with argument completions
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					const text = lines[0] || "";
-					const beforeCursor = text.slice(0, cursorCol);
-
-					// Check if we're in argument completion context
-					const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
-					if (argtestMatch) {
-						const argumentText = argtestMatch[1]!;
-						const allArguments = [
-							{ value: "two", label: "two" },
-							{ value: "three", label: "three" },
-							{ value: "twelve", label: "twelve" },
-						];
-						// Return all items that start with the typed prefix
-						const filtered = allArguments.filter((arg) => arg.value.startsWith(argumentText));
-						if (filtered.length > 0) {
-							return { items: filtered, prefix: argumentText };
-						}
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "/argtest t" - filtered to [two, three, twelve], prefix "t" matches "two" first
-			editor.handleInput("/");
-			editor.handleInput("a");
-			editor.handleInput("r");
-			editor.handleInput("g");
-			editor.handleInput("t");
-			editor.handleInput("e");
-			editor.handleInput("s");
-			editor.handleInput("t");
-			editor.handleInput(" ");
-			editor.handleInput("t");
-
-			await flushAutocomplete();
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Press Enter - "t" prefix matches "two" (first in list), so "two" is applied
-			editor.handleInput("\r");
-			assert.strictEqual(editor.getText(), "/argtest two");
-		});
-
-		it("highlights unique prefix match as user types (before full exact match)", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Mock provider that returns all items unfiltered (like real extensions do)
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					const text = lines[0] || "";
-					const beforeCursor = text.slice(0, cursorCol);
-
-					const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
-					if (argtestMatch) {
-						const argumentText = argtestMatch[1]!;
-						// Return all items - provider does not filter
-						const allArguments = [
-							{ value: "one", label: "one" },
-							{ value: "two", label: "two" },
-							{ value: "three", label: "three" },
-						];
-						return { items: allArguments, prefix: argumentText };
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "/argtest tw" - "tw" is a prefix of only "two"
-			editor.handleInput("/");
-			editor.handleInput("a");
-			editor.handleInput("r");
-			editor.handleInput("g");
-			editor.handleInput("t");
-			editor.handleInput("e");
-			editor.handleInput("s");
-			editor.handleInput("t");
-			editor.handleInput(" ");
-			editor.handleInput("t");
-			editor.handleInput("w");
-
-			assert.strictEqual(editor.getText(), "/argtest tw");
-			await flushAutocomplete();
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Press Enter - "tw" uniquely matches "two", so "two" should be applied
-			editor.handleInput("\r");
-			assert.strictEqual(editor.getText(), "/argtest two");
-		});
-
-		it("selects first prefix match when multiple items match", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Mock provider that returns all items unfiltered
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					const text = lines[0] || "";
-					const beforeCursor = text.slice(0, cursorCol);
-
-					const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
-					if (argtestMatch) {
-						const argumentText = argtestMatch[1]!;
-						const allArguments = [
-							{ value: "one", label: "one" },
-							{ value: "two", label: "two" },
-							{ value: "three", label: "three" },
-						];
-						return { items: allArguments, prefix: argumentText };
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "/argtest t" - "t" is a prefix of both "two" and "three"
-			editor.handleInput("/");
-			editor.handleInput("a");
-			editor.handleInput("r");
-			editor.handleInput("g");
-			editor.handleInput("t");
-			editor.handleInput("e");
-			editor.handleInput("s");
-			editor.handleInput("t");
-			editor.handleInput(" ");
-			editor.handleInput("t");
-
-			await flushAutocomplete();
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Press Enter - "t" matches "two" first, so "two" is selected
-			editor.handleInput("\r");
-			assert.strictEqual(editor.getText(), "/argtest two");
-		});
-
-		it("works for built-in-style command argument completion path (model-like)", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			// Mock provider for /model command with model completions
-			const mockProvider: AutocompleteProvider = {
-				getSuggestions: async (lines, _cursorLine, cursorCol) => {
-					const text = lines[0] || "";
-					const beforeCursor = text.slice(0, cursorCol);
-
-					// Check if we're in /model argument completion context
-					// Use [^ ]+ to match any non-space characters (including hyphens)
-					const modelMatch = beforeCursor.match(/^\/model\s+(\S+)$/);
-					if (modelMatch) {
-						const modelText = modelMatch[1]!;
-						const allModels = [
-							{ value: "gpt-4o", label: "gpt-4o" },
-							{ value: "gpt-4o-mini", label: "gpt-4o-mini" },
-							{ value: "claude-sonnet", label: "claude-sonnet" },
-						];
-						// Return all models that start with the typed prefix
-						const filtered = allModels.filter((m) => m.value.startsWith(modelText));
-						if (filtered.length > 0) {
-							return { items: filtered, prefix: modelText };
-						}
-					}
-					return null;
-				},
-				applyCompletion,
-			};
-
-			editor.setAutocompleteProvider(mockProvider);
-
-			// Type "/model gpt-4o-mini" - exact match for second item in list
-			editor.handleInput("/");
-			editor.handleInput("m");
-			editor.handleInput("o");
-			editor.handleInput("d");
-			editor.handleInput("e");
-			editor.handleInput("l");
-			editor.handleInput(" ");
-			editor.handleInput("g");
-			editor.handleInput("p");
-			editor.handleInput("t");
-			editor.handleInput("-");
-			editor.handleInput("4");
-			editor.handleInput("o");
-			editor.handleInput("-");
-			editor.handleInput("m");
-			editor.handleInput("i");
-			editor.handleInput("n");
-			editor.handleInput("i");
-
-			assert.strictEqual(editor.getText(), "/model gpt-4o-mini");
-			await flushAutocomplete();
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			// Press Enter - should retain exact typed value, not apply first highlighted item
-			editor.handleInput("\r");
-
-			// The exact typed value should be retained
-			assert.strictEqual(editor.getText(), "/model gpt-4o-mini");
-		});
-
-		it("does not show argument completions when command has no argument completer", async () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-			const provider = new CombinedAutocompleteProvider([
-				{ name: "help", description: "Show help" },
-				{
-					name: "model",
-					description: "Switch model",
-					getArgumentCompletions: () => [{ value: "claude-opus", label: "claude-opus" }],
-				},
-			]);
-			editor.setAutocompleteProvider(provider);
-
-			editor.handleInput("/");
-			editor.handleInput("h");
-			editor.handleInput("e");
-			await flushAutocomplete();
-			assert.strictEqual(editor.isShowingAutocomplete(), true);
-
-			editor.handleInput("\t");
-			assert.strictEqual(editor.getText(), "/help ");
-			assert.strictEqual(editor.isShowingAutocomplete(), false);
-		});
-	});
-
-	describe("Character jump (Ctrl+])", () => {
-		it("jumps forward to first occurrence of character on same line", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 0 });
-
-			editor.handleInput("\x1d"); // Ctrl+] (legacy sequence for ctrl+])
-			editor.handleInput("o"); // Jump to first 'o'
-
-			assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 4 }); // 'o' in "hello"
-		});
-
-		it("jumps forward to next occurrence after cursor", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
-
-			editor.setText("hello world");
-			editor.handleInput("\x01"); // Ctrl+A - go to start
-			// Move cursor to the 'o' in "hello" (col 4)
-			for (let i = 0; i < 4; i++) editor.handleInput("\x1b[C");
-			assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 4 });
-
-			editor.handleInput("\x1d"); // Ctrl+]
-			editor.handleInput("o"); // Jump to next 'o' (in "world")
-
-			assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 7 }); // 'o' in "world"
-		});
-
-		it("jumps forward across multiple lines", () => {
-			const editor = new Editor(createTestTUI(), defaultEditorTheme);
+    it("consecutive deletions across lines coalesce into one entry", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // "1\n2\n3" with cursor at end, delete everything with Ctrl+W
+      editor.setText("1\n2\n3");
+      editor.handleInput("\x17"); // Ctrl+W - deletes "3"
+      assert.strictEqual(editor.getText(), "1\n2\n");
+
+      editor.handleInput("\x17"); // Ctrl+W - deletes newline (merge with prev line)
+      assert.strictEqual(editor.getText(), "1\n2");
+
+      editor.handleInput("\x17"); // Ctrl+W - deletes "2"
+      assert.strictEqual(editor.getText(), "1\n");
+
+      editor.handleInput("\x17"); // Ctrl+W - deletes newline
+      assert.strictEqual(editor.getText(), "1");
+
+      editor.handleInput("\x17"); // Ctrl+W - deletes "1"
+      assert.strictEqual(editor.getText(), "");
+
+      // All deletions should have accumulated into one entry
+      editor.handleInput("\x19"); // Ctrl+Y
+      assert.strictEqual(editor.getText(), "1\n2\n3");
+    });
+
+    it("Ctrl+K at line end deletes newline and coalesces", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // "ab" on line 1, "cd" on line 2, cursor at end of line 1
+      editor.setText("");
+      editor.handleInput("a");
+      editor.handleInput("b");
+      editor.handleInput("\n");
+      editor.handleInput("c");
+      editor.handleInput("d");
+      // Move to end of first line
+      editor.handleInput("\x1b[A"); // Up arrow
+      editor.handleInput("\x05"); // Ctrl+E - end of line
+
+      // Now at end of "ab", Ctrl+K should delete newline (merge with "cd")
+      editor.handleInput("\x0b"); // Ctrl+K - deletes newline
+      assert.strictEqual(editor.getText(), "abcd");
+
+      // Continue deleting
+      editor.handleInput("\x0b"); // Ctrl+K - deletes "cd"
+      assert.strictEqual(editor.getText(), "ab");
+
+      // Both deletions should accumulate
+      editor.handleInput("\x19"); // Ctrl+Y
+      assert.strictEqual(editor.getText(), "ab\ncd");
+    });
+
+    it("handles yank in middle of text", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("word");
+      editor.handleInput("\x17"); // Ctrl+W - deletes "word"
+      editor.setText("hello world");
+
+      // Move to middle (after "hello ")
+      editor.handleInput("\x01"); // Ctrl+A
+      for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C");
+
+      editor.handleInput("\x19"); // Ctrl+Y
+      assert.strictEqual(editor.getText(), "hello wordworld");
+    });
+
+    it("handles yank-pop in middle of text", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Create two kill ring entries
+      editor.setText("FIRST");
+      editor.handleInput("\x17"); // Ctrl+W - deletes "FIRST"
+      editor.setText("SECOND");
+      editor.handleInput("\x17"); // Ctrl+W - deletes "SECOND"
+
+      // Ring: ["FIRST", "SECOND"]
+
+      // Set up "hello world" and position cursor after "hello "
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A - go to start of line
+      for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C"); // Move right 6
+
+      // Yank "SECOND" in the middle
+      editor.handleInput("\x19"); // Ctrl+Y
+      assert.strictEqual(editor.getText(), "hello SECONDworld");
+
+      // Yank-pop replaces "SECOND" with "FIRST"
+      editor.handleInput("\x1by"); // Alt+Y
+      assert.strictEqual(editor.getText(), "hello FIRSTworld");
+    });
+
+    it("multiline yank and yank-pop in middle of text", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Create single-line entry
+      editor.setText("SINGLE");
+      editor.handleInput("\x17"); // Ctrl+W - deletes "SINGLE"
+
+      // Create multiline entry via consecutive Ctrl+U
+      editor.setText("A\nB");
+      editor.handleInput("\x15"); // Ctrl+U - deletes "B"
+      editor.handleInput("\x15"); // Ctrl+U - deletes newline
+      editor.handleInput("\x15"); // Ctrl+U - deletes "A"
+      // Ring: ["SINGLE", "A\nB"]
+
+      // Insert in middle of "hello world"
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A
+      for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C");
+
+      // Yank multiline "A\nB"
+      editor.handleInput("\x19"); // Ctrl+Y
+      assert.strictEqual(editor.getText(), "hello A\nBworld");
+
+      // Yank-pop replaces with "SINGLE"
+      editor.handleInput("\x1by"); // Alt+Y
+      assert.strictEqual(editor.getText(), "hello SINGLEworld");
+    });
+
+    it("Alt+D deletes word forward and saves to kill ring", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("hello world test");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+
+      editor.handleInput("\x1bd"); // Alt+D - deletes "hello"
+      assert.strictEqual(editor.getText(), " world test");
+
+      editor.handleInput("\x1bd"); // Alt+D - deletes " world" (skips whitespace, then word)
+      assert.strictEqual(editor.getText(), " test");
+
+      // Yank should get accumulated text
+      editor.handleInput("\x19"); // Ctrl+Y
+      assert.strictEqual(editor.getText(), "hello world test");
+    });
+
+    it("Alt+D at end of line deletes newline", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("line1\nline2");
+      // Move to start of document, then to end of first line
+      editor.handleInput("\x1b[A"); // Up arrow - go to first line
+      editor.handleInput("\x05"); // Ctrl+E - end of line
+
+      editor.handleInput("\x1bd"); // Alt+D - deletes newline (merges lines)
+      assert.strictEqual(editor.getText(), "line1line2");
+
+      editor.handleInput("\x19"); // Ctrl+Y
+      assert.strictEqual(editor.getText(), "line1\nline2");
+    });
+  });
+
+  describe("Undo", () => {
+    it("does nothing when undo stack is empty", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "");
+    });
+
+    it("coalesces consecutive word characters into one undo unit", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      assert.strictEqual(editor.getText(), "hello world");
+
+      // Undo removes " world" (space captured state before it, so we restore to "hello")
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello");
+
+      // Undo removes "hello"
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "");
+    });
+
+    it("undoes spaces one at a time", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput(" ");
+      assert.strictEqual(editor.getText(), "hello  ");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo) - removes second " "
+      assert.strictEqual(editor.getText(), "hello ");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo) - removes first " "
+      assert.strictEqual(editor.getText(), "hello");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo) - removes "hello"
+      assert.strictEqual(editor.getText(), "");
+    });
+
+    it("undoes newlines and signals next word to capture state", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput("\n");
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      assert.strictEqual(editor.getText(), "hello\nworld");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello\n");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "");
+    });
+
+    it("undoes backspace", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput("\x7f"); // Backspace
+      assert.strictEqual(editor.getText(), "hell");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello");
+    });
+
+    it("undoes forward delete", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      editor.handleInput("\x1b[C"); // Right arrow
+      editor.handleInput("\x1b[3~"); // Delete key
+      assert.strictEqual(editor.getText(), "hllo");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello");
+    });
+
+    it("undoes Ctrl+W (delete word backward)", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      assert.strictEqual(editor.getText(), "hello world");
+
+      editor.handleInput("\x17"); // Ctrl+W
+      assert.strictEqual(editor.getText(), "hello ");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+    });
+
+    it("undoes Ctrl+K (delete to line end)", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C"); // Move right 6 times
+
+      editor.handleInput("\x0b"); // Ctrl+K
+      assert.strictEqual(editor.getText(), "hello ");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+
+      editor.handleInput("|");
+      assert.strictEqual(editor.getText(), "hello |world");
+    });
+
+    it("undoes Ctrl+U (delete to line start)", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      for (let i = 0; i < 6; i++) editor.handleInput("\x1b[C"); // Move right 6 times
+
+      editor.handleInput("\x15"); // Ctrl+U
+      assert.strictEqual(editor.getText(), "world");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+    });
+
+    it("undoes yank", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput("\x17"); // Ctrl+W - delete "hello "
+      editor.handleInput("\x19"); // Ctrl+Y - yank
+      assert.strictEqual(editor.getText(), "hello ");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "");
+    });
+
+    it("undoes single-line paste atomically", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
+
+      // Simulate bracketed paste of "beep boop"
+      editor.handleInput("\x1b[200~beep boop\x1b[201~");
+      assert.strictEqual(editor.getText(), "hellobeep boop world");
+
+      // Single undo should restore entire pre-paste state
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+
+      editor.handleInput("|");
+      assert.strictEqual(editor.getText(), "hello| world");
+    });
+
+    it("does not trigger autocomplete during single-line paste", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+      let suggestionCalls = 0;
+
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async () => {
+          suggestionCalls += 1;
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+      editor.handleInput(
+        "\x1b[200~look at @node_modules/react/index.js please\x1b[201~",
+      );
+
+      assert.strictEqual(
+        editor.getText(),
+        "look at @node_modules/react/index.js please",
+      );
+      assert.strictEqual(suggestionCalls, 0);
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+    });
+
+    it("undoes multi-line paste atomically", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
+
+      // Simulate bracketed paste of multi-line text
+      editor.handleInput("\x1b[200~line1\nline2\nline3\x1b[201~");
+      assert.strictEqual(editor.getText(), "helloline1\nline2\nline3 world");
+
+      // Single undo should restore entire pre-paste state
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+
+      editor.handleInput("|");
+      assert.strictEqual(editor.getText(), "hello| world");
+    });
+
+    it("undoes insertTextAtCursor atomically", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
+
+      // Programmatic insertion (e.g., clipboard image path)
+      editor.insertTextAtCursor("/tmp/image.png");
+      assert.strictEqual(editor.getText(), "hello/tmp/image.png world");
+
+      // Single undo should restore entire pre-insert state
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+
+      editor.handleInput("|");
+      assert.strictEqual(editor.getText(), "hello| world");
+    });
+
+    it("insertTextAtCursor handles multiline text", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      for (let i = 0; i < 5; i++) editor.handleInput("\x1b[C"); // Move right 5 (after "hello", before space)
+
+      // Insert multiline text
+      editor.insertTextAtCursor("line1\nline2\nline3");
+      assert.strictEqual(editor.getText(), "helloline1\nline2\nline3 world");
+
+      // Cursor should be at end of inserted text (after "line3", before " world")
+      const cursor = editor.getCursor();
+      assert.strictEqual(cursor.line, 2);
+      assert.strictEqual(cursor.col, 5); // "line3".length
+
+      // Single undo should restore entire pre-insert state
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+    });
+
+    it("insertTextAtCursor normalizes CRLF and CR line endings", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("");
+
+      // Insert text with CRLF
+      editor.insertTextAtCursor("a\r\nb\r\nc");
+      assert.strictEqual(editor.getText(), "a\nb\nc");
+
+      editor.handleInput("\x1b[45;5u"); // Undo
+      assert.strictEqual(editor.getText(), "");
+
+      // Insert text with CR only
+      editor.insertTextAtCursor("x\ry\rz");
+      assert.strictEqual(editor.getText(), "x\ny\nz");
+    });
+
+    it("undoes setText to empty string", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      assert.strictEqual(editor.getText(), "hello world");
+
+      editor.setText("");
+      assert.strictEqual(editor.getText(), "");
+
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+    });
+
+    it("clears undo stack on submit", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+      let submitted = "";
+      editor.onSubmit = (text) => {
+        submitted = text;
+      };
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput("\r"); // Enter - submit
+
+      assert.strictEqual(submitted, "hello");
+      assert.strictEqual(editor.getText(), "");
+
+      // Undo should do nothing - stack was cleared
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "");
+    });
+
+    it("exits history browsing mode on undo", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Add "hello" to history
+      editor.addToHistory("hello");
+      assert.strictEqual(editor.getText(), "");
+
+      // Type "world"
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      assert.strictEqual(editor.getText(), "world");
+
+      // Ctrl+W - delete word
+      editor.handleInput("\x17"); // Ctrl+W
+      assert.strictEqual(editor.getText(), "");
+
+      // Press Up - enter history browsing, shows "hello"
+      editor.handleInput("\x1b[A"); // Up arrow
+      assert.strictEqual(editor.getText(), "hello");
+
+      // Undo should restore to "" (state before entering history browsing)
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "");
+
+      // Undo again should restore to "world" (state before Ctrl+W)
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "world");
+    });
+
+    it("undo restores to pre-history state even after multiple history navigations", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Add history entries
+      editor.addToHistory("first");
+      editor.addToHistory("second");
+      editor.addToHistory("third");
+
+      // Type something
+      editor.handleInput("c");
+      editor.handleInput("u");
+      editor.handleInput("r");
+      editor.handleInput("r");
+      editor.handleInput("e");
+      editor.handleInput("n");
+      editor.handleInput("t");
+      assert.strictEqual(editor.getText(), "current");
+
+      // Clear editor
+      editor.handleInput("\x17"); // Ctrl+W
+      assert.strictEqual(editor.getText(), "");
+
+      // Navigate through history multiple times
+      editor.handleInput("\x1b[A"); // Up - "third"
+      assert.strictEqual(editor.getText(), "third");
+      editor.handleInput("\x1b[A"); // Up - "second"
+      assert.strictEqual(editor.getText(), "second");
+      editor.handleInput("\x1b[A"); // Up - "first"
+      assert.strictEqual(editor.getText(), "first");
+
+      // Undo should go back to "" (state before we started browsing), not intermediate states
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "");
+
+      // Another undo goes back to "current"
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "current");
+    });
+
+    it("cursor movement starts new undo unit", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput(" ");
+      editor.handleInput("w");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("l");
+      editor.handleInput("d");
+      assert.strictEqual(editor.getText(), "hello world");
+
+      // Move cursor left 5 (to after "hello ")
+      for (let i = 0; i < 5; i++) editor.handleInput("\x1b[D");
+
+      // Type "lol" in the middle
+      editor.handleInput("l");
+      editor.handleInput("o");
+      editor.handleInput("l");
+      assert.strictEqual(editor.getText(), "hello lolworld");
+
+      // Undo should restore to "hello world" (before inserting "lol")
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello world");
+
+      editor.handleInput("|");
+      assert.strictEqual(editor.getText(), "hello |world");
+    });
+
+    it("no-op delete operations do not push undo snapshots", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.handleInput("h");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput("l");
+      editor.handleInput("o");
+      assert.strictEqual(editor.getText(), "hello");
+
+      // Delete word on empty - multiple times (should be no-ops)
+      editor.handleInput("\x17"); // Ctrl+W - deletes "hello"
+      assert.strictEqual(editor.getText(), "");
+      editor.handleInput("\x17"); // Ctrl+W - no-op (nothing to delete)
+      editor.handleInput("\x17"); // Ctrl+W - no-op
+
+      // Single undo should restore "hello"
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "hello");
+    });
+
+    it("undoes autocomplete", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Create a mock autocomplete provider
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          const text = lines[0] || "";
+          const prefix = text.slice(0, cursorCol);
+          if (prefix === "di") {
+            return {
+              items: [{ value: "dist/", label: "dist/" }],
+              prefix: "di",
+            };
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "di"
+      editor.handleInput("d");
+      editor.handleInput("i");
+      assert.strictEqual(editor.getText(), "di");
+
+      // Press Tab to trigger autocomplete
+      editor.handleInput("\t");
+      await flushAutocomplete();
+      assert.strictEqual(editor.getText(), "dist/");
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+
+      // Undo should restore to "di"
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "di");
+    });
+  });
+
+  describe("Autocomplete", () => {
+    it("auto-applies single force-file suggestion without showing menu", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol, options) => {
+          if (!options.force) {
+            return null;
+          }
+          const text = lines[0] || "";
+          const prefix = text.slice(0, cursorCol);
+          if (prefix === "Work") {
+            return {
+              items: [{ value: "Workspace/", label: "Workspace/" }],
+              prefix: "Work",
+            };
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "Work"
+      editor.handleInput("W");
+      editor.handleInput("o");
+      editor.handleInput("r");
+      editor.handleInput("k");
+      assert.strictEqual(editor.getText(), "Work");
+
+      // Press Tab - should auto-apply without showing menu
+      editor.handleInput("\t");
+      await flushAutocomplete();
+      assert.strictEqual(editor.getText(), "Workspace/");
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+
+      // Undo should restore to "Work"
+      editor.handleInput("\x1b[45;5u"); // Ctrl+- (undo)
+      assert.strictEqual(editor.getText(), "Work");
+    });
+
+    it("shows menu when force-file has multiple suggestions", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol, options) => {
+          if (!options.force) {
+            return null;
+          }
+          const text = lines[0] || "";
+          const prefix = text.slice(0, cursorCol);
+          if (prefix === "src") {
+            return {
+              items: [
+                { value: "src/", label: "src/" },
+                { value: "src.txt", label: "src.txt" },
+              ],
+              prefix: "src",
+            };
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "src"
+      editor.handleInput("s");
+      editor.handleInput("r");
+      editor.handleInput("c");
+      assert.strictEqual(editor.getText(), "src");
+
+      // Press Tab - should show menu because there are multiple suggestions
+      editor.handleInput("\t");
+      await flushAutocomplete();
+      assert.strictEqual(editor.getText(), "src");
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Press Tab again to accept first suggestion
+      editor.handleInput("\t");
+      assert.strictEqual(editor.getText(), "src/");
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+    });
+
+    it("keeps suggestions open when typing in force mode (Tab-triggered)", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      const allFiles = [
+        { value: "readme.md", label: "readme.md" },
+        { value: "package.json", label: "package.json" },
+        { value: "src/", label: "src/" },
+        { value: "dist/", label: "dist/" },
+      ];
+
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol, options) => {
+          const text = lines[0] || "";
+          const prefix = text.slice(0, cursorCol);
+          const shouldMatch =
+            options.force || prefix.includes("/") || prefix.startsWith(".");
+          if (!shouldMatch) {
+            return null;
+          }
+          const filtered = allFiles.filter((f) =>
+            f.value.toLowerCase().startsWith(prefix.toLowerCase()),
+          );
+          if (filtered.length > 0) {
+            return { items: filtered, prefix };
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Press Tab on empty prompt - should show all files (force mode)
+      editor.handleInput("\t");
+      await flushAutocomplete();
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Type "r" - should narrow to "readme.md" (force mode keeps suggestions open)
+      editor.handleInput("r");
+      await flushAutocomplete();
+      assert.strictEqual(editor.getText(), "r");
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Type "e" - should still show "readme.md"
+      editor.handleInput("e");
+      await flushAutocomplete();
+      assert.strictEqual(editor.getText(), "re");
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Accept with Tab
+      editor.handleInput("\t");
+      assert.strictEqual(editor.getText(), "readme.md");
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+    });
+
+    it("debounces @ autocomplete while typing", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+      let suggestionCalls = 0;
+
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          suggestionCalls += 1;
+          const text = (lines[0] || "").slice(0, cursorCol);
+          return {
+            items: [{ value: "@main.ts", label: "main.ts" }],
+            prefix: text,
+          };
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      editor.handleInput("@");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      editor.handleInput("m");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      editor.handleInput("a");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      editor.handleInput("i");
+
+      assert.strictEqual(suggestionCalls, 0);
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await flushAutocomplete();
+
+      assert.strictEqual(suggestionCalls, 1);
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+    });
+
+    it("aborts active @ autocomplete when typing continues", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+      let aborts = 0;
+
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (_lines, _cursorLine, _cursorCol, options) => {
+          return await new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+              resolve({
+                items: [{ value: "@main.ts", label: "main.ts" }],
+                prefix: "@main",
+              });
+            }, 500);
+            options.signal.addEventListener(
+              "abort",
+              () => {
+                aborts += 1;
+                clearTimeout(timeout);
+                resolve(null);
+              },
+              { once: true },
+            );
+          });
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      editor.handleInput("@");
+      editor.handleInput("m");
+      editor.handleInput("a");
+      editor.handleInput("i");
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      editor.handleInput("n");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      assert.strictEqual(aborts, 1);
+    });
+
+    it("hides autocomplete when backspacing slash command to empty", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Mock provider with slash commands
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          const text = lines[0] || "";
+          const prefix = text.slice(0, cursorCol);
+          // Only return slash command suggestions when line starts with /
+          if (prefix.startsWith("/")) {
+            const commands = [
+              { value: "/model", label: "model", description: "Change model" },
+              { value: "/help", label: "help", description: "Show help" },
+            ];
+            const query = prefix.slice(1); // Remove leading /
+            const filtered = commands.filter((c) => c.value.startsWith(query));
+            if (filtered.length > 0) {
+              return { items: filtered, prefix };
+            }
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "/" - should show slash command suggestions
+      editor.handleInput("/");
+      await flushAutocomplete();
+      assert.strictEqual(editor.getText(), "/");
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Backspace to delete "/" - should hide autocomplete completely
+      editor.handleInput("\x7f"); // Backspace
+      await flushAutocomplete();
+      assert.strictEqual(editor.getText(), "");
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+    });
+
+    it("applies exact typed slash-argument value on Enter even when first item is highlighted", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Mock provider for /argtest command with argument completions
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          const text = lines[0] || "";
+          const beforeCursor = text.slice(0, cursorCol);
+
+          // Check if we're in argument completion context: "/argtest <prefix>"
+          const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
+          if (argtestMatch) {
+            const argumentText = argtestMatch[1]!;
+            const allArguments = [
+              { value: "one", label: "one" },
+              { value: "two", label: "two" },
+              { value: "three", label: "three" },
+            ];
+            // Return all arguments that start with the typed prefix
+            const filtered = allArguments.filter((arg) =>
+              arg.value.startsWith(argumentText),
+            );
+            if (filtered.length > 0) {
+              return { items: filtered, prefix: argumentText };
+            }
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "/argtest two"
+      editor.handleInput("/");
+      editor.handleInput("a");
+      editor.handleInput("r");
+      editor.handleInput("g");
+      editor.handleInput("t");
+      editor.handleInput("e");
+      editor.handleInput("s");
+      editor.handleInput("t");
+      editor.handleInput(" ");
+      editor.handleInput("t");
+      editor.handleInput("w");
+      editor.handleInput("o");
+
+      assert.strictEqual(editor.getText(), "/argtest two");
+      await flushAutocomplete();
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Press Enter - should apply the exact typed value "two", not the first item
+      editor.handleInput("\r");
+
+      // The exact typed value "two" should be retained
+      assert.strictEqual(editor.getText(), "/argtest two");
+    });
+
+    it("selects first prefix match on Enter when typed arg is not exact match", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Mock provider for /argtest command with argument completions
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          const text = lines[0] || "";
+          const beforeCursor = text.slice(0, cursorCol);
+
+          // Check if we're in argument completion context
+          const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
+          if (argtestMatch) {
+            const argumentText = argtestMatch[1]!;
+            const allArguments = [
+              { value: "two", label: "two" },
+              { value: "three", label: "three" },
+              { value: "twelve", label: "twelve" },
+            ];
+            // Return all items that start with the typed prefix
+            const filtered = allArguments.filter((arg) =>
+              arg.value.startsWith(argumentText),
+            );
+            if (filtered.length > 0) {
+              return { items: filtered, prefix: argumentText };
+            }
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "/argtest t" - filtered to [two, three, twelve], prefix "t" matches "two" first
+      editor.handleInput("/");
+      editor.handleInput("a");
+      editor.handleInput("r");
+      editor.handleInput("g");
+      editor.handleInput("t");
+      editor.handleInput("e");
+      editor.handleInput("s");
+      editor.handleInput("t");
+      editor.handleInput(" ");
+      editor.handleInput("t");
+
+      await flushAutocomplete();
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Press Enter - "t" prefix matches "two" (first in list), so "two" is applied
+      editor.handleInput("\r");
+      assert.strictEqual(editor.getText(), "/argtest two");
+    });
+
+    it("highlights unique prefix match as user types (before full exact match)", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Mock provider that returns all items unfiltered (like real extensions do)
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          const text = lines[0] || "";
+          const beforeCursor = text.slice(0, cursorCol);
+
+          const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
+          if (argtestMatch) {
+            const argumentText = argtestMatch[1]!;
+            // Return all items - provider does not filter
+            const allArguments = [
+              { value: "one", label: "one" },
+              { value: "two", label: "two" },
+              { value: "three", label: "three" },
+            ];
+            return { items: allArguments, prefix: argumentText };
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "/argtest tw" - "tw" is a prefix of only "two"
+      editor.handleInput("/");
+      editor.handleInput("a");
+      editor.handleInput("r");
+      editor.handleInput("g");
+      editor.handleInput("t");
+      editor.handleInput("e");
+      editor.handleInput("s");
+      editor.handleInput("t");
+      editor.handleInput(" ");
+      editor.handleInput("t");
+      editor.handleInput("w");
+
+      assert.strictEqual(editor.getText(), "/argtest tw");
+      await flushAutocomplete();
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Press Enter - "tw" uniquely matches "two", so "two" should be applied
+      editor.handleInput("\r");
+      assert.strictEqual(editor.getText(), "/argtest two");
+    });
+
+    it("selects first prefix match when multiple items match", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Mock provider that returns all items unfiltered
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          const text = lines[0] || "";
+          const beforeCursor = text.slice(0, cursorCol);
+
+          const argtestMatch = beforeCursor.match(/^\/argtest\s+(\S+)$/);
+          if (argtestMatch) {
+            const argumentText = argtestMatch[1]!;
+            const allArguments = [
+              { value: "one", label: "one" },
+              { value: "two", label: "two" },
+              { value: "three", label: "three" },
+            ];
+            return { items: allArguments, prefix: argumentText };
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "/argtest t" - "t" is a prefix of both "two" and "three"
+      editor.handleInput("/");
+      editor.handleInput("a");
+      editor.handleInput("r");
+      editor.handleInput("g");
+      editor.handleInput("t");
+      editor.handleInput("e");
+      editor.handleInput("s");
+      editor.handleInput("t");
+      editor.handleInput(" ");
+      editor.handleInput("t");
+
+      await flushAutocomplete();
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Press Enter - "t" matches "two" first, so "two" is selected
+      editor.handleInput("\r");
+      assert.strictEqual(editor.getText(), "/argtest two");
+    });
+
+    it("works for built-in-style command argument completion path (model-like)", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      // Mock provider for /model command with model completions
+      const mockProvider: AutocompleteProvider = {
+        getSuggestions: async (lines, _cursorLine, cursorCol) => {
+          const text = lines[0] || "";
+          const beforeCursor = text.slice(0, cursorCol);
+
+          // Check if we're in /model argument completion context
+          // Use [^ ]+ to match any non-space characters (including hyphens)
+          const modelMatch = beforeCursor.match(/^\/model\s+(\S+)$/);
+          if (modelMatch) {
+            const modelText = modelMatch[1]!;
+            const allModels = [
+              { value: "gpt-4o", label: "gpt-4o" },
+              { value: "gpt-4o-mini", label: "gpt-4o-mini" },
+              { value: "claude-sonnet", label: "claude-sonnet" },
+            ];
+            // Return all models that start with the typed prefix
+            const filtered = allModels.filter((m) =>
+              m.value.startsWith(modelText),
+            );
+            if (filtered.length > 0) {
+              return { items: filtered, prefix: modelText };
+            }
+          }
+          return null;
+        },
+        applyCompletion,
+      };
+
+      editor.setAutocompleteProvider(mockProvider);
+
+      // Type "/model gpt-4o-mini" - exact match for second item in list
+      editor.handleInput("/");
+      editor.handleInput("m");
+      editor.handleInput("o");
+      editor.handleInput("d");
+      editor.handleInput("e");
+      editor.handleInput("l");
+      editor.handleInput(" ");
+      editor.handleInput("g");
+      editor.handleInput("p");
+      editor.handleInput("t");
+      editor.handleInput("-");
+      editor.handleInput("4");
+      editor.handleInput("o");
+      editor.handleInput("-");
+      editor.handleInput("m");
+      editor.handleInput("i");
+      editor.handleInput("n");
+      editor.handleInput("i");
+
+      assert.strictEqual(editor.getText(), "/model gpt-4o-mini");
+      await flushAutocomplete();
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      // Press Enter - should retain exact typed value, not apply first highlighted item
+      editor.handleInput("\r");
+
+      // The exact typed value should be retained
+      assert.strictEqual(editor.getText(), "/model gpt-4o-mini");
+    });
+
+    it("does not show argument completions when command has no argument completer", async () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+      const provider = new CombinedAutocompleteProvider([
+        { name: "help", description: "Show help" },
+        {
+          name: "model",
+          description: "Switch model",
+          getArgumentCompletions: () => [
+            { value: "claude-opus", label: "claude-opus" },
+          ],
+        },
+      ]);
+      editor.setAutocompleteProvider(provider);
+
+      editor.handleInput("/");
+      editor.handleInput("h");
+      editor.handleInput("e");
+      await flushAutocomplete();
+      assert.strictEqual(editor.isShowingAutocomplete(), true);
+
+      editor.handleInput("\t");
+      assert.strictEqual(editor.getText(), "/help ");
+      assert.strictEqual(editor.isShowingAutocomplete(), false);
+    });
+  });
+
+  describe("Character jump (Ctrl+])", () => {
+    it("jumps forward to first occurrence of character on same line", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 0 });
+
+      editor.handleInput("\x1d"); // Ctrl+] (legacy sequence for ctrl+])
+      editor.handleInput("o"); // Jump to first 'o'
+
+      assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 4 }); // 'o' in "hello"
+    });
+
+    it("jumps forward to next occurrence after cursor", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
+
+      editor.setText("hello world");
+      editor.handleInput("\x01"); // Ctrl+A - go to start
+      // Move cursor to the 'o' in "hello" (col 4)
+      for (let i = 0; i < 4; i++) editor.handleInput("\x1b[C");
+      assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 4 });
+
+      editor.handleInput("\x1d"); // Ctrl+]
+      editor.handleInput("o"); // Jump to next 'o' (in "world")
+
+      assert.deepStrictEqual(editor.getCursor(), { line: 0, col: 7 }); // 'o' in "world"
+    });
+
+    it("jumps forward across multiple lines", () => {
+      const editor = new Editor(createTestTUI(), defaultEditorTheme);
 
       editor.handleInput("\x1b\x1d"); // Ctrl+Alt+] (ESC followed by Ctrl+])
       editor.handleInput("o"); // Jump to last 'o' before cursor

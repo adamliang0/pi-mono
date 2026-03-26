@@ -120,40 +120,43 @@ describe("InteractiveMode.showLoadedResources", () => {
     initTheme("dark");
   });
 
-	function createShowLoadedResourcesThis(options: {
-		quietStartup: boolean;
-		verbose?: boolean;
-		skills?: Array<{ filePath: string }>;
-		skillDiagnostics?: Array<{ type: "warning" | "error" | "collision"; message: string }>;
-	}) {
-		const fakeThis: any = {
-			options: { verbose: options.verbose ?? false },
-			chatContainer: new Container(),
-			settingsManager: {
-				getQuietStartup: () => options.quietStartup,
-			},
-			session: {
-				promptTemplates: [],
-				extensionRunner: undefined,
-				resourceLoader: {
-					getPathMetadata: () => new Map(),
-					getAgentsFiles: () => ({ agentsFiles: [] }),
-					getSkills: () => ({
-						skills: options.skills ?? [],
-						diagnostics: options.skillDiagnostics ?? [],
-					}),
-					getPrompts: () => ({ prompts: [], diagnostics: [] }),
-					getExtensions: () => ({ extensions: [], errors: [], runtime: {} }),
-					getThemes: () => ({ themes: [], diagnostics: [] }),
-				},
-			},
-			formatDisplayPath: (p: string) => p,
-			buildScopeGroups: () => [],
-			formatScopeGroups: () => "resource-list",
-			getShortPath: (p: string) => p,
-			formatDiagnostics: () => "diagnostics",
-			getBuiltInCommandConflictDiagnostics: () => [],
-		};
+  function createShowLoadedResourcesThis(options: {
+    quietStartup: boolean;
+    verbose?: boolean;
+    skills?: Array<{ filePath: string }>;
+    skillDiagnostics?: Array<{
+      type: "warning" | "error" | "collision";
+      message: string;
+    }>;
+  }) {
+    const fakeThis: any = {
+      options: { verbose: options.verbose ?? false },
+      chatContainer: new Container(),
+      settingsManager: {
+        getQuietStartup: () => options.quietStartup,
+      },
+      session: {
+        promptTemplates: [],
+        extensionRunner: undefined,
+        resourceLoader: {
+          getPathMetadata: () => new Map(),
+          getAgentsFiles: () => ({ agentsFiles: [] }),
+          getSkills: () => ({
+            skills: options.skills ?? [],
+            diagnostics: options.skillDiagnostics ?? [],
+          }),
+          getPrompts: () => ({ prompts: [], diagnostics: [] }),
+          getExtensions: () => ({ extensions: [], errors: [], runtime: {} }),
+          getThemes: () => ({ themes: [], diagnostics: [] }),
+        },
+      },
+      formatDisplayPath: (p: string) => p,
+      buildScopeGroups: () => [],
+      formatScopeGroups: () => "resource-list",
+      getShortPath: (p: string) => p,
+      formatDiagnostics: () => "diagnostics",
+      getBuiltInCommandConflictDiagnostics: () => [],
+    };
 
     return fakeThis;
   }
@@ -164,11 +167,11 @@ describe("InteractiveMode.showLoadedResources", () => {
       skills: [{ filePath: "/tmp/skill/SKILL.md" }],
     });
 
-		(InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
-			extensions: [{ path: "/tmp/ext/index.ts" }],
-			force: false,
-			showDiagnosticsWhenQuiet: true,
-		});
+    (InteractiveMode as any).prototype.showLoadedResources.call(fakeThis, {
+      extensions: [{ path: "/tmp/ext/index.ts" }],
+      force: false,
+      showDiagnosticsWhenQuiet: true,
+    });
 
     expect(fakeThis.chatContainer.children).toHaveLength(0);
   });

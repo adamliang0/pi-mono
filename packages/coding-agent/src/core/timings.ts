@@ -8,9 +8,9 @@ const timings: Array<{ label: string; ms: number }> = [];
 let lastTime = Date.now();
 
 export function resetTimings(): void {
-	if (!ENABLED) return;
-	timings.length = 0;
-	lastTime = Date.now();
+  if (!ENABLED) return;
+  timings.length = 0;
+  lastTime = Date.now();
 }
 
 export function time(label: string): void {

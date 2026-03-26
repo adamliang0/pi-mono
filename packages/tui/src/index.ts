@@ -2,11 +2,11 @@
 
 // Autocomplete support
 export {
-	type AutocompleteItem,
-	type AutocompleteProvider,
-	type AutocompleteSuggestions,
-	CombinedAutocompleteProvider,
-	type SlashCommand,
+  type AutocompleteItem,
+  type AutocompleteProvider,
+  type AutocompleteSuggestions,
+  CombinedAutocompleteProvider,
+  type SlashCommand,
 } from "./autocomplete.js";
 // Components
 export { Box } from "./components/box.js";

@@ -176,13 +176,15 @@ function generateHtml(sessionData: SessionData, themeName?: string): string {
     "utf-8",
   );
 
-	const themeVars = generateThemeVars(themeName);
-	const colors = getResolvedThemeColors(themeName);
-	const themeExport = getThemeExportColors(themeName);
-	const derivedExportColors = deriveExportColors(colors.userMessageBg || "#343541");
-	const bodyBg = themeExport.pageBg ?? derivedExportColors.pageBg;
-	const containerBg = themeExport.cardBg ?? derivedExportColors.cardBg;
-	const infoBg = themeExport.infoBg ?? derivedExportColors.infoBg;
+  const themeVars = generateThemeVars(themeName);
+  const colors = getResolvedThemeColors(themeName);
+  const themeExport = getThemeExportColors(themeName);
+  const derivedExportColors = deriveExportColors(
+    colors.userMessageBg || "#343541",
+  );
+  const bodyBg = themeExport.pageBg ?? derivedExportColors.pageBg;
+  const containerBg = themeExport.cardBg ?? derivedExportColors.cardBg;
+  const infoBg = themeExport.infoBg ?? derivedExportColors.infoBg;
 
   // Base64 encode session data to avoid escaping issues
   const sessionDataBase64 = Buffer.from(JSON.stringify(sessionData)).toString(

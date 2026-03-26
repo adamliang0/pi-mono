@@ -516,18 +516,20 @@ function forkSessionOrExit(
 }
 
 async function createSessionManager(
-	parsed: Args,
-	cwd: string,
-	extensions: LoadExtensionsResult,
-	settingsManager: SettingsManager,
+  parsed: Args,
+  cwd: string,
+  extensions: LoadExtensionsResult,
+  settingsManager: SettingsManager,
 ): Promise<SessionManager | undefined> {
   if (parsed.noSession) {
     return SessionManager.inMemory();
   }
 
-	// Priority: CLI flag > settings.json > extension hook
-	const effectiveSessionDir =
-		parsed.sessionDir ?? settingsManager.getSessionDir() ?? (await callSessionDirectoryHook(extensions, cwd));
+  // Priority: CLI flag > settings.json > extension hook
+  const effectiveSessionDir =
+    parsed.sessionDir ??
+    settingsManager.getSessionDir() ??
+    (await callSessionDirectoryHook(extensions, cwd));
 
   if (parsed.fork) {
     const resolved = await resolveSessionPath(
@@ -727,12 +729,13 @@ async function handleConfigCommand(args: string[]): Promise<boolean> {
 }
 
 export async function main(args: string[]) {
-	resetTimings();
-	const offlineMode = args.includes("--offline") || isTruthyEnvFlag(process.env.PI_OFFLINE);
-	if (offlineMode) {
-		process.env.PI_OFFLINE = "1";
-		process.env.PI_SKIP_VERSION_CHECK = "1";
-	}
+  resetTimings();
+  const offlineMode =
+    args.includes("--offline") || isTruthyEnvFlag(process.env.PI_OFFLINE);
+  if (offlineMode) {
+    process.env.PI_OFFLINE = "1";
+    process.env.PI_SKIP_VERSION_CHECK = "1";
+  }
 
   if (await handlePackageCommand(args)) {
     return;
@@ -742,17 +745,19 @@ export async function main(args: string[]) {
     return;
   }
 
-	// First pass: parse args to get --extension paths
-	const firstPass = parseArgs(args);
-	time("parseArgs.firstPass");
-	const shouldTakeOverStdout = firstPass.mode !== undefined || firstPass.print || !process.stdin.isTTY;
-	if (shouldTakeOverStdout) {
-		takeOverStdout();
-	}
+  // First pass: parse args to get --extension paths
+  const firstPass = parseArgs(args);
+  time("parseArgs.firstPass");
+  const shouldTakeOverStdout =
+    firstPass.mode !== undefined || firstPass.print || !process.stdin.isTTY;
+  if (shouldTakeOverStdout) {
+    takeOverStdout();
+  }
 
-	// Run migrations (pass cwd for project-local migrations)
-	const { migratedAuthProviders: migratedProviders, deprecationWarnings } = runMigrations(process.cwd());
-	time("runMigrations");
+  // Run migrations (pass cwd for project-local migrations)
+  const { migratedAuthProviders: migratedProviders, deprecationWarnings } =
+    runMigrations(process.cwd());
+  time("runMigrations");
 
   // Early load extensions to discover their CLI flags
   const cwd = process.cwd();
@@ -762,24 +767,24 @@ export async function main(args: string[]) {
   const authStorage = AuthStorage.create();
   const modelRegistry = new ModelRegistry(authStorage, getModelsPath());
 
-	const resourceLoader = new DefaultResourceLoader({
-		cwd,
-		agentDir,
-		settingsManager,
-		additionalExtensionPaths: firstPass.extensions,
-		additionalSkillPaths: firstPass.skills,
-		additionalPromptTemplatePaths: firstPass.promptTemplates,
-		additionalThemePaths: firstPass.themes,
-		noExtensions: firstPass.noExtensions,
-		noSkills: firstPass.noSkills,
-		noPromptTemplates: firstPass.noPromptTemplates,
-		noThemes: firstPass.noThemes,
-		systemPrompt: firstPass.systemPrompt,
-		appendSystemPrompt: firstPass.appendSystemPrompt,
-	});
-	time("createResourceLoader");
-	await resourceLoader.reload();
-	time("resourceLoader.reload");
+  const resourceLoader = new DefaultResourceLoader({
+    cwd,
+    agentDir,
+    settingsManager,
+    additionalExtensionPaths: firstPass.extensions,
+    additionalSkillPaths: firstPass.skills,
+    additionalPromptTemplatePaths: firstPass.promptTemplates,
+    additionalThemePaths: firstPass.themes,
+    noExtensions: firstPass.noExtensions,
+    noSkills: firstPass.noSkills,
+    noPromptTemplates: firstPass.noPromptTemplates,
+    noThemes: firstPass.noThemes,
+    systemPrompt: firstPass.systemPrompt,
+    appendSystemPrompt: firstPass.appendSystemPrompt,
+  });
+  time("createResourceLoader");
+  await resourceLoader.reload();
+  time("resourceLoader.reload");
 
   const extensionsResult: LoadExtensionsResult = resourceLoader.getExtensions();
   for (const { path, error } of extensionsResult.errors) {
@@ -808,9 +813,9 @@ export async function main(args: string[]) {
     }
   }
 
-	// Second pass: parse args with extension flags
-	const parsed = parseArgs(args, extensionFlags);
-	time("parseArgs.secondPass");
+  // Second pass: parse args with extension flags
+  const parsed = parseArgs(args, extensionFlags);
+  time("parseArgs.secondPass");
 
   // Pass flag values to extensions via runtime
   for (const [name, value] of parsed.unknownFlags) {
@@ -834,16 +839,16 @@ export async function main(args: string[]) {
     process.exit(0);
   }
 
-	// Read piped stdin content (if any) - skip for RPC mode which uses stdin for JSON-RPC
-	let stdinContent: string | undefined;
-	if (parsed.mode !== "rpc") {
-		stdinContent = await readPipedStdin();
-		if (stdinContent !== undefined) {
-			// Force print mode since interactive mode requires a TTY for keyboard input
-			parsed.print = true;
-		}
-	}
-	time("readPipedStdin");
+  // Read piped stdin content (if any) - skip for RPC mode which uses stdin for JSON-RPC
+  let stdinContent: string | undefined;
+  if (parsed.mode !== "rpc") {
+    stdinContent = await readPipedStdin();
+    if (stdinContent !== undefined) {
+      // Force print mode since interactive mode requires a TTY for keyboard input
+      parsed.print = true;
+    }
+  }
+  time("readPipedStdin");
 
   if (parsed.export) {
     let result: string;
@@ -861,8 +866,8 @@ export async function main(args: string[]) {
     process.exit(0);
   }
 
-	migrateKeybindingsConfigFile(agentDir);
-	time("migrateKeybindingsConfigFile");
+  migrateKeybindingsConfigFile(agentDir);
+  time("migrateKeybindingsConfigFile");
 
   if (parsed.mode === "rpc" && parsed.fileArgs.length > 0) {
     console.error(
@@ -873,45 +878,52 @@ export async function main(args: string[]) {
 
   validateForkFlags(parsed);
 
-	const { initialMessage, initialImages } = await prepareInitialMessage(
-		parsed,
-		settingsManager.getImageAutoResize(),
-		stdinContent,
-	);
-	time("prepareInitialMessage");
-	const isInteractive = !parsed.print && parsed.mode === undefined;
-	const startupBenchmark = isTruthyEnvFlag(process.env.PI_STARTUP_BENCHMARK);
-	if (startupBenchmark && !isInteractive) {
-		console.error(chalk.red("Error: PI_STARTUP_BENCHMARK only supports interactive mode"));
-		process.exit(1);
-	}
-	const mode = parsed.mode || "text";
-	initTheme(settingsManager.getTheme(), isInteractive);
-	time("initTheme");
+  const { initialMessage, initialImages } = await prepareInitialMessage(
+    parsed,
+    settingsManager.getImageAutoResize(),
+    stdinContent,
+  );
+  time("prepareInitialMessage");
+  const isInteractive = !parsed.print && parsed.mode === undefined;
+  const startupBenchmark = isTruthyEnvFlag(process.env.PI_STARTUP_BENCHMARK);
+  if (startupBenchmark && !isInteractive) {
+    console.error(
+      chalk.red("Error: PI_STARTUP_BENCHMARK only supports interactive mode"),
+    );
+    process.exit(1);
+  }
+  const mode = parsed.mode || "text";
+  initTheme(settingsManager.getTheme(), isInteractive);
+  time("initTheme");
 
   // Show deprecation warnings in interactive mode
   if (isInteractive && deprecationWarnings.length > 0) {
     await showDeprecationWarnings(deprecationWarnings);
   }
 
-	let scopedModels: ScopedModel[] = [];
-	const modelPatterns = parsed.models ?? settingsManager.getEnabledModels();
-	if (modelPatterns && modelPatterns.length > 0) {
-		scopedModels = await resolveModelScope(modelPatterns, modelRegistry);
-	}
-	time("resolveModelScope");
+  let scopedModels: ScopedModel[] = [];
+  const modelPatterns = parsed.models ?? settingsManager.getEnabledModels();
+  if (modelPatterns && modelPatterns.length > 0) {
+    scopedModels = await resolveModelScope(modelPatterns, modelRegistry);
+  }
+  time("resolveModelScope");
 
-	// Create session manager based on CLI flags
-	let sessionManager = await createSessionManager(parsed, cwd, extensionsResult, settingsManager);
-	time("createSessionManager");
+  // Create session manager based on CLI flags
+  let sessionManager = await createSessionManager(
+    parsed,
+    cwd,
+    extensionsResult,
+    settingsManager,
+  );
+  time("createSessionManager");
 
-	// Handle --resume: show session picker
-	if (parsed.resume) {
-		// Compute effective session dir for resume (same logic as createSessionManager)
-		const effectiveSessionDir =
-			parsed.sessionDir ??
-			settingsManager.getSessionDir() ??
-			(await callSessionDirectoryHook(extensionsResult, cwd));
+  // Handle --resume: show session picker
+  if (parsed.resume) {
+    // Compute effective session dir for resume (same logic as createSessionManager)
+    const effectiveSessionDir =
+      parsed.sessionDir ??
+      settingsManager.getSessionDir() ??
+      (await callSessionDirectoryHook(extensionsResult, cwd));
 
     const selectedPath = await selectSession(
       (onProgress) => SessionManager.list(cwd, effectiveSessionDir, onProgress),
@@ -949,8 +961,9 @@ export async function main(args: string[]) {
     authStorage.setRuntimeApiKey(sessionOptions.model.provider, parsed.apiKey);
   }
 
-	const { session, modelFallbackMessage } = await createAgentSession(sessionOptions);
-	time("createAgentSession");
+  const { session, modelFallbackMessage } =
+    await createAgentSession(sessionOptions);
+  time("createAgentSession");
 
   if (!isInteractive && !session.model) {
     console.error(chalk.red("No models available."));
@@ -976,58 +989,69 @@ export async function main(args: string[]) {
     }
   }
 
-	if (mode === "rpc") {
-		printTimings();
-		await runRpcMode(session);
-	} else if (isInteractive) {
-		if (scopedModels.length > 0 && (parsed.verbose || !settingsManager.getQuietStartup())) {
-			const modelList = scopedModels
-				.map((sm) => {
-					const thinkingStr = sm.thinkingLevel ? `:${sm.thinkingLevel}` : "";
-					return `${sm.model.id}${thinkingStr}`;
-				})
-				.join(", ");
-			console.log(chalk.dim(`Model scope: ${modelList} ${chalk.gray("(Ctrl+P to cycle)")}`));
-		}
+  if (mode === "rpc") {
+    printTimings();
+    await runRpcMode(session);
+  } else if (isInteractive) {
+    if (
+      scopedModels.length > 0 &&
+      (parsed.verbose || !settingsManager.getQuietStartup())
+    ) {
+      const modelList = scopedModels
+        .map((sm) => {
+          const thinkingStr = sm.thinkingLevel ? `:${sm.thinkingLevel}` : "";
+          return `${sm.model.id}${thinkingStr}`;
+        })
+        .join(", ");
+      console.log(
+        chalk.dim(
+          `Model scope: ${modelList} ${chalk.gray("(Ctrl+P to cycle)")}`,
+        ),
+      );
+    }
 
-		const interactiveMode = new InteractiveMode(session, {
-			migratedProviders,
-			modelFallbackMessage,
-			initialMessage,
-			initialImages,
-			initialMessages: parsed.messages,
-			verbose: parsed.verbose,
-		});
-		if (startupBenchmark) {
-			await interactiveMode.init();
-			time("interactiveMode.init");
-			printTimings();
-			interactiveMode.stop();
-			stopThemeWatcher();
-			if (process.stdout.writableLength > 0) {
-				await new Promise<void>((resolve) => process.stdout.once("drain", resolve));
-			}
-			if (process.stderr.writableLength > 0) {
-				await new Promise<void>((resolve) => process.stderr.once("drain", resolve));
-			}
-			return;
-		}
+    const interactiveMode = new InteractiveMode(session, {
+      migratedProviders,
+      modelFallbackMessage,
+      initialMessage,
+      initialImages,
+      initialMessages: parsed.messages,
+      verbose: parsed.verbose,
+    });
+    if (startupBenchmark) {
+      await interactiveMode.init();
+      time("interactiveMode.init");
+      printTimings();
+      interactiveMode.stop();
+      stopThemeWatcher();
+      if (process.stdout.writableLength > 0) {
+        await new Promise<void>((resolve) =>
+          process.stdout.once("drain", resolve),
+        );
+      }
+      if (process.stderr.writableLength > 0) {
+        await new Promise<void>((resolve) =>
+          process.stderr.once("drain", resolve),
+        );
+      }
+      return;
+    }
 
-		printTimings();
-		await interactiveMode.run();
-	} else {
-		printTimings();
-		const exitCode = await runPrintMode(session, {
-			mode,
-			messages: parsed.messages,
-			initialMessage,
-			initialImages,
-		});
-		stopThemeWatcher();
-		restoreStdout();
-		if (exitCode !== 0) {
-			process.exitCode = exitCode;
-		}
-		return;
-	}
+    printTimings();
+    await interactiveMode.run();
+  } else {
+    printTimings();
+    const exitCode = await runPrintMode(session, {
+      mode,
+      messages: parsed.messages,
+      initialMessage,
+      initialImages,
+    });
+    stopThemeWatcher();
+    restoreStdout();
+    if (exitCode !== 0) {
+      process.exitCode = exitCode;
+    }
+    return;
+  }
 }
