@@ -18,7 +18,7 @@ export function createEventBus(): EventBusController {
     on: (channel, handler) => {
       const safeHandler = async (data: unknown) => {
         try {
-          await handler(data);
+          handler(data);
         } catch (err) {
           console.error(`Event handler error (${channel}):`, err);
         }

@@ -9,7 +9,7 @@ import {
   createAgentSession,
   ModelRegistry,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 // Default: AuthStorage uses ~/.pi/agent/auth.json
 // ModelRegistry loads built-in + custom models from ~/.pi/agent/models.json

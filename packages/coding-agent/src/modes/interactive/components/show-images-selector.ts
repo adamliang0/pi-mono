@@ -3,7 +3,7 @@ import {
   type SelectItem,
   SelectList,
   type SelectListLayoutOptions,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import { getSelectListTheme } from "../theme/theme.js";
 import { DynamicBorder } from "./dynamic-border.js";
 

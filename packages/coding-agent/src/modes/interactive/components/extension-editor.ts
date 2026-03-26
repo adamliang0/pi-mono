@@ -16,7 +16,7 @@ import {
   Spacer,
   Text,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import type { KeybindingsManager } from "../../../core/keybindings.js";
 import { getEditorTheme, theme } from "../theme/theme.js";
 import { DynamicBorder } from "./dynamic-border.js";

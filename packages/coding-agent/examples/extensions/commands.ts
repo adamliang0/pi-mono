@@ -13,7 +13,7 @@
 import type {
   ExtensionAPI,
   SlashCommandInfo,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 export default function commandsExtension(pi: ExtensionAPI) {
   pi.registerCommand("commands", {

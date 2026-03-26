@@ -9,7 +9,7 @@ import {
   type ImageContent,
   modelsAreEqual,
   supportsXhigh,
-} from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
 import chalk from "chalk";
 import { createInterface } from "readline";
 import { type Args, parseArgs, printHelp } from "./cli/args.js";

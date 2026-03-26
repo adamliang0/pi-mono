@@ -3,8 +3,8 @@ import {
   Agent,
   type AgentMessage,
   type ThinkingLevel,
-} from "@mariozechner/pi-agent-core";
-import type { Message, Model } from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-agent-core";
+import type { Message, Model } from "@adamliang0/pi-ai";
 import { getAgentDir, getDocsPath } from "../config.js";
 import { AgentSession } from "./agent-session.js";
 import { AuthStorage } from "./auth-storage.js";
@@ -145,7 +145,7 @@ function getDefaultAgentDir(): string {
  * const { session } = await createAgentSession();
  *
  * // With explicit model
- * import { getModel } from '@mariozechner/pi-ai';
+ * import { getModel } from 'adamliang0/pi-ai';
  * const { session } = await createAgentSession({
  *   model: getModel('anthropic', 'claude-opus-4-5'),
  *   thinkingLevel: 'high',
@@ -261,7 +261,7 @@ export async function createAgentSession(
   }
 
   // Clamp to model capabilities
-  if (!model || !model.reasoning) {
+  if (!model?.reasoning) {
     thinkingLevel = "off";
   }
 

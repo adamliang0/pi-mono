@@ -5,9 +5,9 @@
  * the selected file in VS Code's diff view.
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { DynamicBorder } from "@mariozechner/pi-coding-agent";
-import { Container, Key, matchesKey, type SelectItem, SelectList, Text } from "@mariozechner/pi-tui";
+import type { ExtensionAPI } from "@adamliang0/pi-coding-agent";
+import { DynamicBorder } from "@adamliang0/pi-coding-agent";
+import { Container, Key, matchesKey, type SelectItem, SelectList, Text } from "@adamliang0/pi-tui";
 
 interface FileInfo {
 	status: string;
@@ -170,11 +170,11 @@ export default function (pi: ExtensionAPI) {
 				let currentIndex = 0;
 
 				const selectList = new SelectList(items, visibleRows, {
-					selectedPrefix: (t) => theme.fg("accent", t),
-					selectedText: (t) => t, // Keep existing colors
-					description: (t) => theme.fg("muted", t),
-					scrollInfo: (t) => theme.fg("dim", t),
-					noMatch: (t) => theme.fg("warning", t),
+					selectedPrefix: (t: string) => theme.fg("accent", t),
+					selectedText: (t: string) => t, // Keep existing colors
+					description: (t: string) => theme.fg("muted", t),
+					scrollInfo: (t: string) => theme.fg("dim", t),
+					noMatch: (t: string) => theme.fg("warning", t),
 				});
 				selectList.onSelect = (item) => {
 					void openSelected(item.value as FileInfo);

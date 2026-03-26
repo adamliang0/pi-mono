@@ -10,7 +10,7 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   // Store ctx for use in event handler

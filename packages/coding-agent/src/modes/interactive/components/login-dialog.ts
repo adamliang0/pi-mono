@@ -1,4 +1,4 @@
-import { getOAuthProviders } from "@mariozechner/pi-ai/oauth";
+import { getOAuthProviders } from "@adamliang0/pi-ai/oauth";
 import {
   Container,
   type Focusable,
@@ -7,7 +7,7 @@ import {
   Spacer,
   Text,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import { exec } from "child_process";
 import { theme } from "../theme/theme.js";
 import { DynamicBorder } from "./dynamic-border.js";

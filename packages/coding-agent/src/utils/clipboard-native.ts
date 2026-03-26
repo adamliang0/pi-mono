@@ -15,7 +15,7 @@ const hasDisplay =
 
 if (!process.env.TERMUX_VERSION && hasDisplay) {
   try {
-    clipboard = require("@mariozechner/clipboard") as ClipboardModule;
+    clipboard = require("@adamliang0/clipboard") as ClipboardModule;
   } catch {
     clipboard = null;
   }

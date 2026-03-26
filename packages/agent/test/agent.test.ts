@@ -3,7 +3,7 @@ import {
   type AssistantMessageEvent,
   EventStream,
   getModel,
-} from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
 import { describe, expect, it } from "vitest";
 import { Agent } from "../src/index.js";
 

@@ -9,19 +9,19 @@ import { createRequire } from "node:module";
 import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
+import * as _bundledPiAgentCore from "@adamliang0/pi-agent-core";
+import * as _bundledPiAi from "@adamliang0/pi-ai";
+import * as _bundledPiAiOauth from "@adamliang0/pi-ai/oauth";
+import type { KeyId } from "@adamliang0/pi-tui";
+import * as _bundledPiTui from "@adamliang0/pi-tui";
 import { createJiti } from "@mariozechner/jiti";
-import * as _bundledPiAgentCore from "@mariozechner/pi-agent-core";
-import * as _bundledPiAi from "@mariozechner/pi-ai";
-import * as _bundledPiAiOauth from "@mariozechner/pi-ai/oauth";
-import type { KeyId } from "@mariozechner/pi-tui";
-import * as _bundledPiTui from "@mariozechner/pi-tui";
 // Static imports of packages that extensions may use.
 // These MUST be static so Bun bundles them into the compiled binary.
 // The virtualModules option then makes them available to extensions.
 import * as _bundledTypebox from "@sinclair/typebox";
 import { getAgentDir, isBunBinary } from "../../config.js";
 // NOTE: This import works because loader.ts exports are NOT re-exported from index.ts,
-// avoiding a circular dependency. Extensions can import from @mariozechner/pi-coding-agent.
+// avoiding a circular dependency. Extensions can import from adamliang0/pi-coding-agent.
 import * as _bundledPiCodingAgent from "../../index.js";
 import { createEventBus, type EventBus } from "../event-bus.js";
 import type { ExecOptions } from "../exec.js";
@@ -42,11 +42,11 @@ import type {
 /** Modules available to extensions via virtualModules (for compiled Bun binary) */
 const VIRTUAL_MODULES: Record<string, unknown> = {
   "@sinclair/typebox": _bundledTypebox,
-  "@mariozechner/pi-agent-core": _bundledPiAgentCore,
-  "@mariozechner/pi-tui": _bundledPiTui,
-  "@mariozechner/pi-ai": _bundledPiAi,
-  "@mariozechner/pi-ai/oauth": _bundledPiAiOauth,
-  "@mariozechner/pi-coding-agent": _bundledPiCodingAgent,
+  "@adamliang0/pi-agent-core": _bundledPiAgentCore,
+  "@adamliang0/pi-tui": _bundledPiTui,
+  "@adamliang0/pi-ai": _bundledPiAi,
+  "@adamliang0/pi-ai/oauth": _bundledPiAiOauth,
+  "@adamliang0/pi-coding-agent": _bundledPiCodingAgent,
 };
 
 const require = createRequire(import.meta.url);
@@ -81,22 +81,22 @@ function getAliases(): Record<string, string> {
   };
 
   _aliases = {
-    "@mariozechner/pi-coding-agent": packageIndex,
-    "@mariozechner/pi-agent-core": resolveWorkspaceOrImport(
+    "@adamliang0/pi-coding-agent": packageIndex,
+    "@adamliang0/pi-agent-core": resolveWorkspaceOrImport(
       "agent/dist/index.js",
-      "@mariozechner/pi-agent-core",
+      "@adamliang0/pi-agent-core",
     ),
-    "@mariozechner/pi-tui": resolveWorkspaceOrImport(
+    "@adamliang0/pi-tui": resolveWorkspaceOrImport(
       "tui/dist/index.js",
-      "@mariozechner/pi-tui",
+      "@adamliang0/pi-tui",
     ),
-    "@mariozechner/pi-ai": resolveWorkspaceOrImport(
+    "@adamliang0/pi-ai": resolveWorkspaceOrImport(
       "ai/dist/index.js",
-      "@mariozechner/pi-ai",
+      "@adamliang0/pi-ai",
     ),
-    "@mariozechner/pi-ai/oauth": resolveWorkspaceOrImport(
+    "@adamliang0/pi-ai/oauth": resolveWorkspaceOrImport(
       "ai/dist/oauth.js",
-      "@mariozechner/pi-ai/oauth",
+      "@adamliang0/pi-ai/oauth",
     ),
     "@sinclair/typebox": typeboxRoot,
   };

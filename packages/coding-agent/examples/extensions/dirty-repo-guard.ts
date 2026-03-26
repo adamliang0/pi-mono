@@ -8,7 +8,7 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 async function checkDirtyRepo(
   pi: ExtensionAPI,

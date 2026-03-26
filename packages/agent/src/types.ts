@@ -9,7 +9,7 @@ import type {
   TextContent,
   Tool,
   ToolResultMessage,
-} from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
 import type { Static, TSchema } from "@sinclair/typebox";
 
 /**
@@ -245,7 +245,7 @@ export type ThinkingLevel =
  *
  * @example
  * ```typescript
- * declare module "@mariozechner/agent" {
+ * declare module "@adamliang0/agent" {
  *   interface CustomAgentMessages {
  *     artifact: ArtifactMessage;
  *     notification: NotificationMessage;

@@ -14,7 +14,7 @@ import {
   type Model,
   registerApiProvider,
   streamSimple,
-} from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
 import { readFileSync } from "fs";
 import { getAgentDir } from "packages/coding-agent/src/config.js";
 import { join } from "path";

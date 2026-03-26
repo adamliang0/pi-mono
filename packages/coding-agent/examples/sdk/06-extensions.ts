@@ -17,7 +17,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 // Extensions are discovered automatically from standard locations.
 // You can also add paths via settings.json or DefaultResourceLoader options.
@@ -56,7 +56,7 @@ console.log();
 
 // Example extension file (./my-logging-extension.ts):
 /*
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@adamliang0/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
 	pi.on("agent_start", async () => {

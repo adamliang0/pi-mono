@@ -28,14 +28,14 @@ import type {
   EditToolDetails,
   ExtensionAPI,
   ReadToolDetails,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 import {
   createBashTool,
   createEditTool,
   createReadTool,
   createWriteTool,
-} from "@mariozechner/pi-coding-agent";
-import { Text } from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-coding-agent";
+import { Text } from "@adamliang0/pi-tui";
 
 export default function (pi: ExtensionAPI) {
   const cwd = process.cwd();

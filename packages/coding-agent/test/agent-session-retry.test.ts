@@ -5,13 +5,13 @@ import {
   Agent,
   type AgentEvent,
   type AgentTool,
-} from "@mariozechner/pi-agent-core";
+} from "@adamliang0/pi-agent-core";
 import {
   type AssistantMessage,
   type AssistantMessageEvent,
   EventStream,
   getModel,
-} from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
 import { Type } from "@sinclair/typebox";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AgentSession } from "../src/core/agent-session.js";

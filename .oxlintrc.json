@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "eslint",
+    "promise",
+    "node",
+    "unicorn",
+  ],
+  "categories": {},
+  "rules": {},
+  "settings": {
+    "vitest": {
+      "typecheck": false
+    }
+  },
+  "options": {
+    "typeAware": true,
+    "typeCheck": true
+  },
+  "env": {
+    "builtin": true
+  },
+  "globals": {},
+  "ignorePatterns": [
+    "node_modules/**/*",
+    "dist/**/*",
+    "build/**/*",
+    "coverage/**/*",
+    "logs/**/*",
+    "tmp/**/*",
+    "*.log",
+    "*.log.*",
+    "*.log.*.*",
+  ]
+}

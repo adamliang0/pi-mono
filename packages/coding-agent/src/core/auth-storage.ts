@@ -11,12 +11,12 @@ import {
   type OAuthCredentials,
   type OAuthLoginCallbacks,
   type OAuthProviderId,
-} from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
 import {
   getOAuthApiKey,
   getOAuthProvider,
   getOAuthProviders,
-} from "@mariozechner/pi-ai/oauth";
+} from "@adamliang0/pi-ai/oauth";
 import {
   chmodSync,
   existsSync,

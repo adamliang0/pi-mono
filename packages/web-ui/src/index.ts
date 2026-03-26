@@ -5,8 +5,8 @@ export type {
   AgentMessage,
   AgentState,
   ThinkingLevel,
-} from "@mariozechner/pi-agent-core";
-export type { Model } from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-agent-core";
+export type { Model } from "@adamliang0/pi-ai";
 export { ChatPanel } from "./ChatPanel.js";
 // Components
 export { AgentInterface } from "./components/AgentInterface.js";

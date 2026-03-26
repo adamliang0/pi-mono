@@ -8,7 +8,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 // Option 1: Replace prompt entirely
 const loader1 = new DefaultResourceLoader({

@@ -5,7 +5,7 @@
  * Multiple questions: tab bar navigation between questions
  */
 
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@adamliang0/pi-coding-agent";
 import {
   Editor,
   type EditorTheme,
@@ -13,7 +13,7 @@ import {
   matchesKey,
   Text,
   truncateToWidth,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 // Types

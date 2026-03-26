@@ -3,8 +3,8 @@ import type {
   Model,
   ToolResultMessage,
   UserMessage,
-} from "@mariozechner/pi-ai";
-import { getModel } from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
+import { getModel } from "@adamliang0/pi-ai";
 import { describe, expect, it } from "vitest";
 import { Agent } from "../src/index.js";
 import { hasBedrockCredentials } from "./bedrock-utils.js";
@@ -308,28 +308,28 @@ describe("Agent E2E Tests", () => {
   );
 
   /*describe.skipIf(!process.env.CEREBRAS_API_KEY)("Cerebras Provider (gpt-oss-120b)", () => {
-		const model = getModel("cerebras", "gpt-oss-120b");
+    const model = getModel("cerebras", "gpt-oss-120b");
 
-		it("should handle basic text prompt", async () => {
-			await basicPrompt(model);
-		});
+    it("should handle basic text prompt", async () => {
+      await basicPrompt(model);
+    });
 
-		it("should execute tools correctly", async () => {
-			await toolExecution(model);
-		});
+    it("should execute tools correctly", async () => {
+      await toolExecution(model);
+    });
 
-		it("should handle abort during execution", async () => {
-			await abortExecution(model);
-		});
+    it("should handle abort during execution", async () => {
+      await abortExecution(model);
+    });
 
-		it("should emit state updates during streaming", async () => {
-			await stateUpdates(model);
-		});
+    it("should emit state updates during streaming", async () => {
+      await stateUpdates(model);
+    });
 
-		it("should maintain context across multiple turns", async () => {
-			await multiTurnConversation(model);
-		});
-	});*/
+    it("should maintain context across multiple turns", async () => {
+      await multiTurnConversation(model);
+    });
+  });*/
 
   describe.skipIf(!process.env.ZAI_API_KEY)(
     "zAI Provider (glm-4.5-air)",

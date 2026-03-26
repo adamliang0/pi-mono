@@ -49,7 +49,10 @@ export interface KeybindingDefinition {
 }
 
 export type KeybindingDefinitions = Record<string, KeybindingDefinition>;
-export type KeybindingsConfig = Record<string, KeyId | readonly KeyId[] | undefined>;
+export type KeybindingsConfig = Record<
+  string,
+  KeyId | readonly KeyId[] | undefined
+>;
 
 export const TUI_KEYBINDINGS = {
   "tui.editor.cursorUp": { defaultKeys: "up", description: "Move cursor up" },

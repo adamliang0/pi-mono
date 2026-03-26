@@ -1,11 +1,11 @@
-import type { AssistantMessage } from "@mariozechner/pi-ai";
+import type { AssistantMessage } from "@adamliang0/pi-ai";
 import {
   Container,
   Markdown,
   type MarkdownTheme,
   Spacer,
   Text,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import { getMarkdownTheme, theme } from "../theme/theme.js";
 
 /**

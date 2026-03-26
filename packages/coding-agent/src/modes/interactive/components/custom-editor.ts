@@ -3,7 +3,7 @@ import {
   type EditorOptions,
   type EditorTheme,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import type {
   AppKeybinding,
   KeybindingsManager,

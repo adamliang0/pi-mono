@@ -9,7 +9,7 @@ import type {
   ExtensionAPI,
   SessionBeforeSwitchEvent,
   SessionMessageEntry,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on(

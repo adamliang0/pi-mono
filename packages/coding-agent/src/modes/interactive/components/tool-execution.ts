@@ -7,7 +7,7 @@ import {
   Spacer,
   Text,
   type TUI,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import type {
   ToolDefinition,
   ToolRenderContext,

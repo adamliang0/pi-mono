@@ -12,13 +12,13 @@ import type {
   ExtensionAPI,
   ExtensionCommandContext,
   Theme,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 import {
   CURSOR_MARKER,
   type Focusable,
   matchesKey,
   visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 
 export default function (pi: ExtensionAPI) {
   pi.registerCommand("overlay-test", {

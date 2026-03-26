@@ -7,7 +7,7 @@
 import {
   createAgentSession,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 // In-memory (no persistence)
 const { session: inMemory } = await createAgentSession({

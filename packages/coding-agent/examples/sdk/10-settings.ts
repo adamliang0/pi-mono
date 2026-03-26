@@ -8,7 +8,7 @@ import {
   createAgentSession,
   SessionManager,
   SettingsManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 // Load current settings (merged global + project)
 const settingsManagerFromDisk = SettingsManager.create();

@@ -13,7 +13,7 @@ import {
   Spacer,
   truncateToWidth,
   visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import { CONFIG_DIR_NAME } from "../../../config.js";
 import type {
   PathMetadata,

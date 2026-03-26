@@ -6,7 +6,7 @@ import {
   getKeybindings,
   type Keybinding,
   type KeyId,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import { theme } from "../theme/theme.js";
 
 function formatKeys(keys: KeyId[]): string {

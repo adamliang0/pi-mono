@@ -538,7 +538,7 @@ export const streamGoogleGeminiCli: StreamFunction<
         }
       }
 
-      if (!response || !response.ok) {
+      if (!response?.ok) {
         throw lastError ?? new Error("Failed to get response after retries");
       }
 

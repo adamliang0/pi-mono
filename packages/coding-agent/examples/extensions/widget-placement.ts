@@ -1,7 +1,7 @@
 import type {
   ExtensionAPI,
   ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 const applyWidgets = (ctx: ExtensionContext) => {
   if (!ctx.hasUI) return;

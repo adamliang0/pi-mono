@@ -8,7 +8,7 @@ import {
   createAgentSession,
   DefaultResourceLoader,
   SessionManager,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 // Disable context files entirely by returning an empty list in agentsFilesOverride.
 const loader = new DefaultResourceLoader({

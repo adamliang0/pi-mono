@@ -12,7 +12,7 @@ import {
   Text,
   truncateToWidth,
   visibleWidth,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-tui";
 import { KeybindingsManager } from "../../../core/keybindings.js";
 import type {
   SessionInfo,

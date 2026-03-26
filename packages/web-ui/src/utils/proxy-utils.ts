@@ -3,8 +3,8 @@ import type {
   Context,
   Model,
   SimpleStreamOptions,
-} from "@mariozechner/pi-ai";
-import { streamSimple } from "@mariozechner/pi-ai";
+} from "@adamliang0/pi-ai";
+import { streamSimple } from "@adamliang0/pi-ai";
 
 /**
  * Centralized proxy decision logic.

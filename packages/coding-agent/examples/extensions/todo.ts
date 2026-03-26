@@ -10,13 +10,13 @@
  * correct for that point in history.
  */
 
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@adamliang0/pi-ai";
 import type {
   ExtensionAPI,
   ExtensionContext,
   Theme,
-} from "@mariozechner/pi-coding-agent";
-import { matchesKey, Text, truncateToWidth } from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-coding-agent";
+import { matchesKey, Text, truncateToWidth } from "@adamliang0/pi-tui";
 import { Type } from "@sinclair/typebox";
 
 interface Todo {

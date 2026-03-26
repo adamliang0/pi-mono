@@ -1,13 +1,4 @@
 <!-- OSS_WEEKEND_START -->
-# 🏖️ OSS Weekend
-
-**Issue tracker reopens Monday, March 30, 2026.**
-
-OSS weekend runs Sunday, March 22, 2026 through Monday, March 30, 2026. New issues are auto-closed during this time. For support, join [Discord](https://discord.com/invite/3cU7Bz4UPx).
-<!-- OSS_WEEKEND_END -->
-
----
-
 <p align="center">
   <a href="https://shittycodingagent.ai">
     <img src="https://shittycodingagent.ai/logo.svg" alt="pi logo" width="128">
@@ -100,6 +91,7 @@ bun run release:patch  # or release:minor, release:major
 ```
 
 The `release.yml` workflow then automatically:
+
 1. Publishes all packages to npm
 2. Builds binaries for all platforms (macOS, Linux, Windows)
 3. Creates a GitHub release with binaries and changelog

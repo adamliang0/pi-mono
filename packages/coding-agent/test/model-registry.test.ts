@@ -12,9 +12,9 @@ import type {
   Context,
   Model,
   OpenAICompletionsCompat,
-} from "@mariozechner/pi-ai";
-import { getApiProvider } from "@mariozechner/pi-ai";
-import { getOAuthProvider } from "@mariozechner/pi-ai/oauth";
+} from "@adamliang0/pi-ai";
+import { getApiProvider } from "@adamliang0/pi-ai";
+import { getOAuthProvider } from "@adamliang0/pi-ai/oauth";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AuthStorage } from "../src/core/auth-storage.js";
 import { clearApiKeyCache, ModelRegistry } from "../src/core/model-registry.js";

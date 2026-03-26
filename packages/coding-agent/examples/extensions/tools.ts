@@ -13,13 +13,9 @@ import type {
   ExtensionAPI,
   ExtensionContext,
   ToolInfo,
-} from "@mariozechner/pi-coding-agent";
-import { getSettingsListTheme } from "@mariozechner/pi-coding-agent";
-import {
-  Container,
-  type SettingItem,
-  SettingsList,
-} from "@mariozechner/pi-tui";
+} from "@adamliang0/pi-coding-agent";
+import { getSettingsListTheme } from "@adamliang0/pi-coding-agent";
+import { Container, type SettingItem, SettingsList } from "@adamliang0/pi-tui";
 
 // State persisted to session
 interface ToolsState {

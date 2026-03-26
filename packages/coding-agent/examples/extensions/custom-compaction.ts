@@ -13,12 +13,12 @@
  *   pi --extension examples/extensions/custom-compaction.ts
  */
 
-import { complete } from "@mariozechner/pi-ai";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { complete } from "@adamliang0/pi-ai";
+import type { ExtensionAPI } from "@adamliang0/pi-coding-agent";
 import {
   convertToLlm,
   serializeConversation,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
   pi.on("session_before_compact", async (event, ctx) => {

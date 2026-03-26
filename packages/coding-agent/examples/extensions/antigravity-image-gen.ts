@@ -29,12 +29,12 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { StringEnum } from "@mariozechner/pi-ai";
+import { StringEnum } from "@adamliang0/pi-ai";
 import {
   type ExtensionAPI,
   getAgentDir,
   withFileMutationQueue,
-} from "@mariozechner/pi-coding-agent";
+} from "@adamliang0/pi-coding-agent";
 import { type Static, Type } from "@sinclair/typebox";
 
 const PROVIDER = "google-antigravity";
@@ -242,7 +242,7 @@ function resolveSaveConfig(params: ToolParams, cwd: string): SaveConfig {
   if (mode === "custom") {
     const dir =
       params.saveDir || process.env.PI_IMAGE_SAVE_DIR || config.saveDir;
-    if (!dir || !dir.trim()) {
+    if (!dir?.trim()) {
       throw new Error("save=custom requires saveDir or PI_IMAGE_SAVE_DIR.");
     }
     return { mode, outputDir: dir };
