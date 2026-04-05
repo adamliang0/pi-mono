@@ -59,7 +59,7 @@ if [[ -n "$PLATFORM" ]]; then
 fi
 
 echo "==> Installing dependencies..."
-npm ci
+bun install --frozen-lockfile
 
 if [[ "$SKIP_DEPS" == "false" ]]; then
     echo "==> Installing cross-platform native bindings..."
@@ -87,7 +87,7 @@ else
 fi
 
 echo "==> Building all packages..."
-npm run build
+bun run build
 
 echo "==> Building binaries..."
 cd packages/coding-agent
