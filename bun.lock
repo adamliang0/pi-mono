@@ -1441,6 +1441,10 @@
 
     "path-scurry/lru-cache": ["lru-cache@11.2.7", "", {}, "sha512-aY/R+aEsRelme17KGQa/1ZSIpLpNYYrhcrepKTZgE+W3WM16YMCaPwOHLHsmopZHELU0Ojin1lPVxKR0MihncA=="],
 
+    "pi-web-ui-example/@mariozechner/pi-ai": ["@mariozechner/pi-ai@file:packages/ai", { "dependencies": { "@anthropic-ai/sdk": "^0.82.0", "@aws-sdk/client-bedrock-runtime": "^3.1024.0", "@google/genai": "^1.48.0", "@mistralai/mistralai": "2.1.2", "@sinclair/typebox": "^0.34.49", "@smithy/node-http-handler": "^4.5.1", "ai": "^6.0.146", "ajv": "^8.18.0", "ajv-formats": "^3.0.1", "chalk": "^5.6.2", "openai": "6.33.0", "partial-json": "^0.1.7", "proxy-agent": "^8.0.0", "undici": "^8.0.2", "zod-to-json-schema": "^3.25.2" }, "devDependencies": { "@types/node": "^25.5.2", "canvas": "^3.2.3", "vitest": "^4.1.2" }, "bin": { "pi-ai": "./dist/cli.js" } }],
+
+    "pi-web-ui-example/@mariozechner/pi-web-ui": ["@mariozechner/pi-web-ui@file:packages/web-ui", { "dependencies": { "@lmstudio/sdk": "^1.5.0", "@mariozechner/pi-agent-core": "workspace:*", "@mariozechner/pi-ai": "workspace:*", "@mariozechner/pi-tui": "workspace:*", "@sinclair/typebox": "^0.34.49", "docx-preview": "^0.3.7", "highlight.js": "^11.11.1", "jszip": "^3.10.1", "lucide": "^0.544.0", "ollama": "^0.6.3", "pdfjs-dist": "5.6.205", "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz" }, "devDependencies": { "@mariozechner/mini-lit": "^0.2.1", "@tailwindcss/cli": "^4.2.2", "concurrently": "^9.2.1", "tailwindcss": "^4.2.2", "typescript": "^6.0.2" }, "peerDependencies": { "@mariozechner/mini-lit": "^0.2.0", "lit": "^3.3.1" } }],
+
     "string-width/strip-ansi": ["strip-ansi@6.0.1", "", { "dependencies": { "ansi-regex": "^5.0.1" } }, "sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A=="],
 
     "tar-stream/readable-stream": ["readable-stream@3.6.2", "", { "dependencies": { "inherits": "^2.0.3", "string_decoder": "^1.1.1", "util-deprecate": "^1.0.1" } }, "sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA=="],
@@ -1470,6 +1474,8 @@
     "form-data/mime-types/mime-db": ["mime-db@1.52.0", "", {}, "sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg=="],
 
     "gaxios/https-proxy-agent/agent-base": ["agent-base@7.1.4", "", {}, "sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ=="],
+
+    "pi-web-ui-example/@mariozechner/pi-web-ui/@mariozechner/pi-ai": ["@mariozechner/pi-ai@file:packages/ai", { "dependencies": { "@anthropic-ai/sdk": "^0.82.0", "@aws-sdk/client-bedrock-runtime": "^3.1024.0", "@google/genai": "^1.48.0", "@mistralai/mistralai": "2.1.2", "@sinclair/typebox": "^0.34.49", "@smithy/node-http-handler": "^4.5.1", "ai": "^6.0.146", "ajv": "^8.18.0", "ajv-formats": "^3.0.1", "chalk": "^5.6.2", "openai": "6.33.0", "partial-json": "^0.1.7", "proxy-agent": "^8.0.0", "undici": "^8.0.2", "zod-to-json-schema": "^3.25.2" }, "devDependencies": { "@types/node": "^25.5.2", "canvas": "^3.2.3", "vitest": "^4.1.2" }, "bin": { "pi-ai": "./dist/cli.js" } }],
 
     "string-width/strip-ansi/ansi-regex": ["ansi-regex@5.0.1", "", {}, "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ=="],
 
