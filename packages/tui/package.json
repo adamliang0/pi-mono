@@ -6,8 +6,8 @@
 	"main": "dist/index.js",
 	"scripts": {
 		"clean": "shx rm -rf dist",
-		"build": "tsgo -p tsconfig.build.json",
-		"dev": "tsgo -p tsconfig.build.json --watch --preserveWatchOutput",
+		"build": "tsgo -b tsconfig.build.json",
+		"dev": "tsgo -b tsconfig.build.json --watch --preserveWatchOutput",
 		"test": "node --test --import tsx test/*.test.ts",
 		"prepublishOnly": "npm run clean && npm run build"
 	},

@@ -33,8 +33,12 @@ out.jsonl
 pi-*.html
 out.html
 packages/coding-agent/binaries/
+bin/
 todo.md
 
 # Turbo cache
 .turbo/
 plans/
+
+#rumdl
+.rumdl-cache
