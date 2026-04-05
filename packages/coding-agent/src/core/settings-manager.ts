@@ -98,6 +98,8 @@ export interface Settings {
 	showHardwareCursor?: boolean; // Show terminal cursor while still positioning it for IME
 	markdown?: MarkdownSettings;
 	sessionDir?: string; // Custom session storage directory (same format as --session-dir CLI flag)
+	/** Prompt template name (filename without .md) to send as the first message in interactive mode when stdin, @files, and CLI text are absent. Resolved from project `.pi/prompts/` then `~/.pi/agent/prompts/`. */
+	startupPromptTemplate?: string;
 }
 
 /** Deep merge settings: project/overrides take precedence, nested objects merge recursively */
@@ -707,6 +709,10 @@ export class SettingsManager {
 		this.globalSettings.shellPath = path;
 		this.markModified("shellPath");
 		this.save();
+	}
+
+	getStartupPromptTemplate(): string | undefined {
+		return this.settings.startupPromptTemplate;
 	}
 
 	getQuietStartup(): boolean {
