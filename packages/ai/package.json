@@ -1,6 +1,6 @@
 {
 	"name": "@mariozechner/pi-ai",
-	"version": "0.67.6",
+	"version": "0.66.1",
 	"description": "Unified LLM API with automatic model discovery and provider configuration",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -72,20 +72,20 @@
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "^0.90.0",
-		"@aws-sdk/client-bedrock-runtime": "^3.1030.0",
-		"@google/genai": "^1.40.0",
-		"@mistralai/mistralai": "1.14.1",
-		"@sinclair/typebox": "^0.34.41",
-		"@smithy/node-http-handler": "^4.0.0",
-		"ajv": "^8.17.1",
+		"@anthropic-ai/sdk": "^0.82.0",
+		"@aws-sdk/client-bedrock-runtime": "^3.1024.0",
+		"@google/genai": "^1.48.0",
+		"@mistralai/mistralai": "2.1.2",
+		"@sinclair/typebox": "^0.34.49",
+		"@smithy/node-http-handler": "^4.5.1",
+		"ajv": "^8.18.0",
 		"ajv-formats": "^3.0.1",
 		"chalk": "^5.6.2",
-		"openai": "6.26.0",
+		"openai": "6.33.0",
 		"partial-json": "^0.1.7",
-		"proxy-agent": "^6.5.0",
-		"undici": "^7.19.1",
-		"zod-to-json-schema": "^3.24.6"
+		"proxy-agent": "^8.0.0",
+		"undici": "^8.0.2",
+		"zod-to-json-schema": "^3.25.2"
 	},
 	"keywords": [
 		"ai",
@@ -108,8 +108,8 @@
 		"node": ">=20.0.0"
 	},
 	"devDependencies": {
-		"@types/node": "^24.3.0",
-		"canvas": "^3.2.0",
-		"vitest": "^3.2.4"
+		"@types/node": "^25.5.2",
+		"canvas": "^3.2.3",
+		"vitest": "^4.1.2"
 	}
 }
