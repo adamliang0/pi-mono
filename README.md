@@ -104,6 +104,22 @@ Use the **Release (GitHub binaries)** workflow: [.github/workflows/release-githu
 
 Pushes performed with `GITHUB_TOKEN` do not trigger other workflows; this workflow uploads assets itself. **Tags pushed manually** from your machine still trigger **Build Binaries** ([.github/workflows/build-binaries.yml](.github/workflows/build-binaries.yml)) on `v*` tags.
 
+### GitHub Release binaries without Actions
+
+Use your machine plus [GitHub CLI](https://cli.github.com/) (`gh`). Ensure the release **tag already exists** on GitHub (for example you already ran `SKIP_NPM_PUBLISH=1 bun run release:patch` and pushed `vX.Y.Z`).
+
+```bash
+gh auth login
+./scripts/build-binaries.sh
+bun run upload-github-binaries v0.65.1
+```
+
+Omit the tag argument to use the version from `packages/ai/package.json`. The script creates the GitHub Release if missing, or **`gh release upload --clobber`** if it already exists. Release notes are taken from `packages/coding-agent/CHANGELOG.md` for that version (falls back to a one-line message). Requires `awk` in `PATH` (macOS/Linux).
+
+### npm packages (no GitHub binaries)
+
+To publish **scoped packages** to the registry only: `bun run publish` (runs `prepublishOnly` first). Use npm/bun login for your scope beforehand.
+
 ## Maintaining the repo
 
 | Task | What to run / where |
@@ -112,7 +128,7 @@ Pushes performed with `GITHUB_TOKEN` do not trigger other workflows; this workfl
 | Full test sweep | `bun run test`; contributors also use `./test.sh` per [CONTRIBUTING.md](CONTRIBUTING.md) |
 | Lockstep versions after manual edits | `node scripts/sync-versions.js` if you ever set versions by hand (normally `bun run version:*` handles it) |
 | Changelog discipline | Only edit `## [Unreleased]`; never rewrite released version sections ([AGENTS.md](AGENTS.md)) |
-| CI | [ci.yml](.github/workflows/ci.yml) on pushes/PRs; binary builds on `v*` tags or manual dispatch |
+| CI | [ci.yml](.github/workflows/ci.yml) on pushes/PRs; binary builds on `v*` tags or manual dispatch; if Actions fail, `bun run upload-github-binaries` after `./scripts/build-binaries.sh` |
 | Per-package docs | `packages/*/README.md` (e.g. coding agent install and provider setup) |
 
 For detailed automation rules (fork vs upstream, OSS weekend, issue labels, hooks), use [AGENTS.md](AGENTS.md).
