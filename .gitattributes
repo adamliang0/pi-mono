@@ -21,3 +21,7 @@
 *.gz binary
 *.woff binary
 *.woff2 binary
+
+# Generated files
+# Keep the current side on merge/rebase conflicts and regenerate as needed.
+packages/ai/src/models.generated.ts merge=ours

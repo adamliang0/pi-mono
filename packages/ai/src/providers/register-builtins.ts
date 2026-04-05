@@ -16,6 +16,7 @@ import type { AzureOpenAIResponsesOptions } from "./azure-openai-responses.js";
 import type { GoogleOptions } from "./google.js";
 import type { GoogleGeminiCliOptions } from "./google-gemini-cli.js";
 import type { GoogleVertexOptions } from "./google-vertex.js";
+import type { MiniMaxOptions } from "./minimax.js";
 import type { MistralOptions } from "./mistral.js";
 import type { OpenAICodexResponsesOptions } from "./openai-codex-responses.js";
 import type { OpenAICompletionsOptions } from "./openai-completions.js";
@@ -62,6 +63,11 @@ interface GoogleVertexProviderModule {
 interface MistralProviderModule {
 	streamMistral: StreamFunction<"mistral-conversations", MistralOptions>;
 	streamSimpleMistral: StreamFunction<"mistral-conversations", SimpleStreamOptions>;
+}
+
+interface MiniMaxProviderModule {
+	streamMiniMax: StreamFunction<"minimax", MiniMaxOptions>;
+	streamSimpleMiniMax: StreamFunction<"minimax", SimpleStreamOptions>;
 }
 
 interface OpenAICodexResponsesProviderModule {
@@ -111,6 +117,9 @@ let googleVertexProviderModulePromise:
 	| undefined;
 let mistralProviderModulePromise:
 	| Promise<LazyProviderModule<"mistral-conversations", MistralOptions, SimpleStreamOptions>>
+	| undefined;
+let miniMaxProviderModulePromise:
+	| Promise<LazyProviderModule<"minimax", MiniMaxOptions, SimpleStreamOptions>>
 	| undefined;
 let openAICodexResponsesProviderModulePromise:
 	| Promise<LazyProviderModule<"openai-codex-responses", OpenAICodexResponsesOptions, SimpleStreamOptions>>
@@ -287,6 +296,17 @@ function loadMistralProviderModule(): Promise<
 	return mistralProviderModulePromise;
 }
 
+function loadMiniMaxProviderModule(): Promise<LazyProviderModule<"minimax", MiniMaxOptions, SimpleStreamOptions>> {
+	miniMaxProviderModulePromise ||= import("./minimax.js").then((module) => {
+		const provider = module as MiniMaxProviderModule;
+		return {
+			stream: provider.streamMiniMax,
+			streamSimple: provider.streamSimpleMiniMax,
+		};
+	});
+	return miniMaxProviderModulePromise;
+}
+
 function loadOpenAICodexResponsesProviderModule(): Promise<
 	LazyProviderModule<"openai-codex-responses", OpenAICodexResponsesOptions, SimpleStreamOptions>
 > {
@@ -354,6 +374,8 @@ export const streamGoogleVertex = createLazyStream(loadGoogleVertexProviderModul
 export const streamSimpleGoogleVertex = createLazySimpleStream(loadGoogleVertexProviderModule);
 export const streamMistral = createLazyStream(loadMistralProviderModule);
 export const streamSimpleMistral = createLazySimpleStream(loadMistralProviderModule);
+export const streamMiniMax = createLazyStream(loadMiniMaxProviderModule);
+export const streamSimpleMiniMax = createLazySimpleStream(loadMiniMaxProviderModule);
 export const streamOpenAICodexResponses = createLazyStream(loadOpenAICodexResponsesProviderModule);
 export const streamSimpleOpenAICodexResponses = createLazySimpleStream(loadOpenAICodexResponsesProviderModule);
 export const streamOpenAICompletions = createLazyStream(loadOpenAICompletionsProviderModule);
@@ -380,6 +402,12 @@ export function registerBuiltInApiProviders(): void {
 		api: "mistral-conversations",
 		stream: streamMistral,
 		streamSimple: streamSimpleMistral,
+	});
+
+	registerApiProvider({
+		api: "minimax",
+		stream: streamMiniMax,
+		streamSimple: streamSimpleMiniMax,
 	});
 
 	registerApiProvider({
