@@ -3,6 +3,7 @@
 /**
  * Syncs ALL @mariozechner/* package dependency versions to match their current versions.
  * This ensures lockstep versioning across the monorepo.
+ * Leaves `workspace:*` (and any `workspace:` range) unchanged so Bun/npm workspace links stay intact.
  */
 
 import { readFileSync, writeFileSync, readdirSync } from 'fs';
@@ -55,6 +56,9 @@ for (const [dir, pkg] of Object.entries(packages)) {
   if (pkg.data.dependencies) {
     for (const [depName, currentVersion] of Object.entries(pkg.data.dependencies)) {
       if (versionMap[depName]) {
+        if (typeof currentVersion === "string" && currentVersion.startsWith("workspace:")) {
+          continue;
+        }
         const newVersion = `^${versionMap[depName]}`;
         if (currentVersion !== newVersion) {
           console.log(`\n${pkg.data.name}:`);
@@ -71,6 +75,9 @@ for (const [dir, pkg] of Object.entries(packages)) {
   if (pkg.data.devDependencies) {
     for (const [depName, currentVersion] of Object.entries(pkg.data.devDependencies)) {
       if (versionMap[depName]) {
+        if (typeof currentVersion === "string" && currentVersion.startsWith("workspace:")) {
+          continue;
+        }
         const newVersion = `^${versionMap[depName]}`;
         if (currentVersion !== newVersion) {
           console.log(`\n${pkg.data.name}:`);
