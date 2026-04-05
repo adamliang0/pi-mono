@@ -1,11 +1,12 @@
 import { Mistral } from "@mistralai/mistralai";
+import type { RequestOptions } from "@mistralai/mistralai/lib/sdks.js";
 import type {
 	ChatCompletionStreamRequest,
 	ChatCompletionStreamRequestMessage,
 	CompletionEvent,
 	ContentChunk,
 	FunctionTool,
-} from "@mistralai/mistralai/models/components";
+} from "@mistralai/mistralai/models/components/index.js";
 import { getEnvApiKey } from "../env-api-keys.js";
 import { calculateCost } from "../models.js";
 import type {
@@ -35,12 +36,9 @@ const MAX_MISTRAL_ERROR_BODY_CHARS = 4000;
 /**
  * Provider-specific options for the Mistral API.
  */
-type MistralReasoningEffort = "none" | "high";
-
 export interface MistralOptions extends StreamOptions {
 	toolChoice?: "auto" | "none" | "any" | "required" | { type: "function"; function: { name: string } };
 	promptMode?: "reasoning";
-	reasoningEffort?: MistralReasoningEffort;
 }
 
 /**
@@ -120,12 +118,10 @@ export const streamSimpleMistral: StreamFunction<"mistral-conversations", Simple
 
 	const base = buildBaseOptions(model, options, apiKey);
 	const reasoning = clampReasoning(options?.reasoning);
-	const shouldUseReasoning = model.reasoning && reasoning !== undefined;
 
 	return streamMistral(model, context, {
 		...base,
-		promptMode: shouldUseReasoning && usesPromptModeReasoning(model) ? "reasoning" : undefined,
-		reasoningEffort: shouldUseReasoning && usesReasoningEffort(model) ? mapReasoningEffort(reasoning) : undefined,
+		promptMode: model.reasoning && reasoning ? "reasoning" : undefined,
 	} satisfies MistralOptions);
 };
 
@@ -209,15 +205,10 @@ function safeJsonStringify(value: unknown): string {
 	}
 }
 
-function buildRequestOptions(model: Model<"mistral-conversations">, options?: MistralOptions) {
-	const requestOptions: {
-		signal?: AbortSignal;
-		retries: { strategy: "none" };
-		headers?: Record<string, string>;
-	} = {
-		retries: { strategy: "none" },
-	};
+function buildRequestOptions(model: Model<"mistral-conversations">, options?: MistralOptions): RequestOptions {
+	const requestOptions: RequestOptions = {};
 	if (options?.signal) requestOptions.signal = options.signal;
+	requestOptions.retries = { strategy: "none" };
 
 	const headers: Record<string, string> = {};
 	if (model.headers) Object.assign(headers, model.headers);
@@ -252,8 +243,7 @@ function buildChatPayload(
 	if (options?.temperature !== undefined) payload.temperature = options.temperature;
 	if (options?.maxTokens !== undefined) payload.maxTokens = options.maxTokens;
 	if (options?.toolChoice) payload.toolChoice = mapToolChoice(options.toolChoice);
-	if (options?.promptMode) payload.promptMode = options.promptMode;
-	if (options?.reasoningEffort) payload.reasoningEffort = options.reasoningEffort;
+	if (options?.promptMode) payload.promptMode = options.promptMode as any;
 
 	if (context.systemPrompt) {
 		payload.messages.unshift({
@@ -456,26 +446,10 @@ function toFunctionTools(tools: Tool[]): Array<FunctionTool & { type: "function"
 		function: {
 			name: tool.name,
 			description: tool.description,
-			parameters: stripSymbolKeys(tool.parameters) as Record<string, unknown>,
+			parameters: tool.parameters as unknown as Record<string, unknown>,
 			strict: false,
 		},
 	}));
-}
-
-function stripSymbolKeys(value: unknown): unknown {
-	if (Array.isArray(value)) {
-		return value.map((item) => stripSymbolKeys(item));
-	}
-
-	if (value && typeof value === "object") {
-		const result: Record<string, unknown> = {};
-		for (const [key, entry] of Object.entries(value)) {
-			result[key] = stripSymbolKeys(entry);
-		}
-		return result;
-	}
-
-	return value;
 }
 
 function toChatMessages(messages: Message[], supportsImages: boolean): ChatCompletionStreamRequestMessage[] {
@@ -584,18 +558,6 @@ function buildToolResultText(text: string, hasImages: boolean, supportsImages: b
 	}
 
 	return isError ? "[tool error] (no tool output)" : "(no tool output)";
-}
-
-function usesReasoningEffort(model: Model<"mistral-conversations">): boolean {
-	return model.id === "mistral-small-2603" || model.id === "mistral-small-latest";
-}
-
-function usesPromptModeReasoning(model: Model<"mistral-conversations">): boolean {
-	return model.reasoning && !usesReasoningEffort(model);
-}
-
-function mapReasoningEffort(_level: Exclude<SimpleStreamOptions["reasoning"], undefined>): MistralReasoningEffort {
-	return "high";
 }
 
 function mapToolChoice(
