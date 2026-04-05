@@ -46,6 +46,7 @@ Edit directly or use `/settings` for common options.
 | `editorPaddingX` | number | `0` | Horizontal padding for input editor (0-3) |
 | `autocompleteMaxVisible` | number | `5` | Max visible items in autocomplete dropdown (3-20) |
 | `showHardwareCursor` | boolean | `false` | Show terminal cursor |
+| `startupPromptTemplate` | string | - | Name of a prompt template file (without `.md`) to send automatically as the **first** user message when starting **interactive** mode with an empty session, no piped stdin, no `@file` args, and no CLI prompt text. Looks up `.pi/prompts/<name>.md` in the session cwd, then `~/.pi/agent/prompts/<name>.md`. Body text (after optional YAML frontmatter) is sent as the message. |
 
 ### Compaction
 
