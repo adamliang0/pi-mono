@@ -4,6 +4,8 @@ import type {
 	MessageCreateParamsStreaming,
 	MessageParam,
 } from "@anthropic-ai/sdk/resources/messages.js";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import { getEnvApiKey } from "../env-api-keys.js";
 import { calculateCost } from "../models.js";
 import type {
@@ -25,6 +27,7 @@ import type {
 	ToolResultMessage,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
+import { isPlainObject } from "../utils/is-plain-object.js";
 import { parseStreamingJson } from "../utils/json-parse.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 
@@ -864,19 +867,66 @@ function convertMessages(
 	return params;
 }
 
+/** Subset of JSON Schema / TypeBox object shape we map to Anthropic `input_schema`. */
+const anthropicToolParameterSource = Type.Object(
+	{
+		properties: Type.Optional(Type.Record(Type.String(), Type.Any())),
+		required: Type.Optional(Type.Array(Type.String())),
+	},
+	{ additionalProperties: true },
+);
+
+function extractAnthropicInputSchemaFields(parameters: unknown): {
+	properties: Record<string, unknown>;
+	required: string[];
+} {
+	const empty: { properties: Record<string, unknown>; required: string[] } = {
+		properties: {},
+		required: [],
+	};
+	if (parameters === undefined || parameters === null) {
+		return empty;
+	}
+	if (!Value.Check(anthropicToolParameterSource, parameters)) {
+		return empty;
+	}
+	if (!isPlainObject(parameters)) {
+		return empty;
+	}
+
+	const properties: Record<string, unknown> = {};
+	const required: string[] = [];
+
+	const rawProps = parameters.properties;
+	if (isPlainObject(rawProps)) {
+		Object.assign(properties, rawProps);
+	}
+
+	const rawReq = parameters.required;
+	if (Array.isArray(rawReq)) {
+		for (const x of rawReq) {
+			if (typeof x === "string") {
+				required.push(x);
+			}
+		}
+	}
+
+	return { properties, required };
+}
+
 function convertTools(tools: Tool[], isOAuthToken: boolean): Anthropic.Messages.Tool[] {
 	if (!tools) return [];
 
 	return tools.map((tool) => {
-		const jsonSchema = tool.parameters as any; // TypeBox already generates JSON Schema
+		const { properties, required } = extractAnthropicInputSchemaFields(tool.parameters);
 
 		return {
 			name: isOAuthToken ? toClaudeCodeName(tool.name) : tool.name,
 			description: tool.description,
 			input_schema: {
 				type: "object" as const,
-				properties: jsonSchema.properties || {},
-				required: jsonSchema.required || [],
+				properties,
+				required,
 			},
 		};
 	});
