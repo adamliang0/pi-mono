@@ -98,6 +98,7 @@ export class FooterDataProvider {
 	private availableProviderCount = 0;
 	private refreshTimer: ReturnType<typeof setTimeout> | null = null;
 	private refreshInFlight = false;
+	/** Set when HEAD may have changed while a refresh was in flight (not used for reftable coalescing). */
 	private refreshPending = false;
 	private disposed = false;
 
@@ -212,12 +213,15 @@ export class FooterDataProvider {
 		for (const cb of this.branchChangeCallbacks) cb();
 	}
 
-	private scheduleRefresh(): void {
-		if (this.disposed || this.refreshTimer) return;
+	private scheduleRefresh(source: "head" | "reftable"): void {
+		if (this.disposed) return;
 		if (this.refreshInFlight) {
-			this.refreshPending = true;
+			if (source === "head") {
+				this.refreshPending = true;
+			}
 			return;
 		}
+		if (this.refreshTimer) return;
 		this.refreshTimer = setTimeout(() => {
 			this.refreshTimer = null;
 			void this.refreshGitBranchAsync();
@@ -227,7 +231,6 @@ export class FooterDataProvider {
 	private async refreshGitBranchAsync(): Promise<void> {
 		if (this.disposed) return;
 		if (this.refreshInFlight) {
-			this.refreshPending = true;
 			return;
 		}
 
@@ -245,7 +248,7 @@ export class FooterDataProvider {
 			this.refreshInFlight = false;
 			if (this.refreshPending && !this.disposed) {
 				this.refreshPending = false;
-				this.scheduleRefresh();
+				void this.refreshGitBranchAsync();
 			}
 		}
 	}
@@ -289,7 +292,7 @@ export class FooterDataProvider {
 		try {
 			this.headWatcher = watch(dirname(this.gitPaths.headPath), (_eventType, filename) => {
 				if (!filename || filename.toString() === "HEAD") {
-					this.scheduleRefresh();
+					this.scheduleRefresh("head");
 				}
 			});
 		} catch {
@@ -302,7 +305,7 @@ export class FooterDataProvider {
 		if (existsSync(reftableDir)) {
 			try {
 				this.reftableWatcher = watch(reftableDir, () => {
-					this.scheduleRefresh();
+					this.scheduleRefresh("reftable");
 				});
 			} catch {
 				// Silently fail if we can't watch
@@ -313,7 +316,7 @@ export class FooterDataProvider {
 				this.reftableTablesListPath = tablesListPath;
 				try {
 					this.reftableTablesListWatcher = watch(tablesListPath, () => {
-						this.scheduleRefresh();
+						this.scheduleRefresh("reftable");
 					});
 				} catch {
 					// Silently fail if we can't watch
@@ -324,7 +327,7 @@ export class FooterDataProvider {
 						current.ctimeMs !== previous.ctimeMs ||
 						current.size !== previous.size
 					) {
-						this.scheduleRefresh();
+						this.scheduleRefresh("reftable");
 					}
 				});
 			}
