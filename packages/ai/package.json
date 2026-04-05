@@ -65,9 +65,9 @@
 	"scripts": {
 		"clean": "shx rm -rf dist",
 		"generate-models": "npx tsx scripts/generate-models.ts",
-		"build": "npm run generate-models && tsgo -p tsconfig.build.json",
-		"dev": "tsgo -p tsconfig.build.json --watch --preserveWatchOutput",
-		"dev:tsc": "tsgo -p tsconfig.build.json --watch --preserveWatchOutput",
+		"build": "npm run generate-models && tsgo -b tsconfig.build.json",
+		"dev": "tsgo -b tsconfig.build.json --watch --preserveWatchOutput",
+		"dev:tsc": "tsgo -b tsconfig.build.json --watch --preserveWatchOutput",
 		"test": "vitest --run",
 		"prepublishOnly": "npm run clean && npm run build"
 	},
