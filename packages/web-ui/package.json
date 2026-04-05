@@ -18,13 +18,16 @@
 	},
 	"dependencies": {
 		"@lmstudio/sdk": "^1.5.0",
-		"@mariozechner/pi-ai": "^0.65.0",
-		"@mariozechner/pi-tui": "^0.65.0",
+		"@mariozechner/pi-agent-core": "workspace:*",
+		"@mariozechner/pi-ai": "workspace:*",
+		"@mariozechner/pi-tui": "workspace:*",
+		"@sinclair/typebox": "^0.34.49",
 		"docx-preview": "^0.3.7",
+		"highlight.js": "^11.11.1",
 		"jszip": "^3.10.1",
 		"lucide": "^0.544.0",
-		"ollama": "^0.6.0",
-		"pdfjs-dist": "5.4.394",
+		"ollama": "^0.6.3",
+		"pdfjs-dist": "5.6.205",
 		"xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
 	},
 	"peerDependencies": {
@@ -32,10 +35,11 @@
 		"lit": "^3.3.1"
 	},
 	"devDependencies": {
-		"@mariozechner/mini-lit": "^0.2.0",
-		"@tailwindcss/cli": "^4.0.0-beta.14",
+		"@mariozechner/mini-lit": "^0.2.1",
+		"@tailwindcss/cli": "^4.2.2",
+		"tailwindcss": "^4.2.2",
 		"concurrently": "^9.2.1",
-		"typescript": "^5.7.3"
+		"typescript": "^6.0.2"
 	},
 	"keywords": [
 		"ai",
