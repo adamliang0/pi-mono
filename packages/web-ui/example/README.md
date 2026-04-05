@@ -1,6 +1,5 @@
 # Pi Web UI - Example
 
-This is a minimal example showing how to use `@mariozechner/pi-web-ui` in a web application.
 
 ## Setup
 
