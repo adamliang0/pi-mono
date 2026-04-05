@@ -9,8 +9,8 @@
  *   node scripts/upload-pi-binaries-to-github-release.mjs [vX.Y.Z]
  * If the tag is omitted, uses packages/ai/package.json version with a v prefix.
  */
-import { spawnSync } from "node:child_process";
-import { execFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
