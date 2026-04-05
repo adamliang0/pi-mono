@@ -33,6 +33,7 @@ out.jsonl
 pi-*.html
 out.html
 packages/coding-agent/binaries/
+bin/
 todo.md
 
 # Turbo cache
@@ -41,3 +42,6 @@ plans/
 .pi/hf-sessions/
 .pi/hf-sessions-backup/
 collect.sh
+
+#rumdl
+.rumdl-cache
