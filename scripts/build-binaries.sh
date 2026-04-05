@@ -4,7 +4,9 @@
 # Mirrors .github/workflows/build-binaries.yml
 #
 # Usage:
-#   ./scripts/build-binaries.sh [--skip-deps] [--platform <platform>]
+#   bash scripts/build-binaries.sh [--skip-deps] [--platform <platform>]
+#   (Do not run with `bun ./scripts/build-binaries.sh` — Bun treats .sh as JS and fails.)
+#   Or: chmod +x scripts/build-binaries.sh && ./scripts/build-binaries.sh ...
 #
 # Options:
 #   --skip-deps         Skip installing cross-platform dependencies
@@ -63,25 +65,15 @@ bun install --frozen-lockfile
 
 if [[ "$SKIP_DEPS" == "false" ]]; then
     echo "==> Installing cross-platform native bindings..."
-    # npm ci only installs optional deps for the current platform
-    # We need all platform bindings for bun cross-compilation
-    # Use --force to bypass platform checks (os/cpu restrictions in package.json)
-    # Install all in one command to avoid npm removing packages from previous installs
-    npm install --no-save --force \
-        @mariozechner/clipboard-darwin-arm64@0.3.0 \
-        @mariozechner/clipboard-darwin-x64@0.3.0 \
-        @mariozechner/clipboard-linux-x64-gnu@0.3.0 \
-        @mariozechner/clipboard-linux-arm64-gnu@0.3.0 \
-        @mariozechner/clipboard-win32-x64-msvc@0.3.0 \
-        @img/sharp-darwin-arm64@0.34.5 \
-        @img/sharp-darwin-x64@0.34.5 \
-        @img/sharp-linux-x64@0.34.5 \
-        @img/sharp-linux-arm64@0.34.5 \
-        @img/sharp-win32-x64@0.34.5 \
-        @img/sharp-libvips-darwin-arm64@1.2.4 \
-        @img/sharp-libvips-darwin-x64@1.2.4 \
-        @img/sharp-libvips-linux-x64@1.2.4 \
-        @img/sharp-libvips-linux-arm64@1.2.4
+    # Bun only resolves optional native packages for the host OS; the binary build
+    # embeds all targets. Fetch registry tarballs in parallel (stdlib Python only;
+    # avoids npm/arborist on Bun's node_modules) and unpack into root node_modules.
+    PYTHON="${PYTHON:-python3}"
+    if ! command -v "${PYTHON}" >/dev/null 2>&1; then
+        echo "error: ${PYTHON} not found (needed for fetch-native-bindings.py)" >&2
+        exit 1
+    fi
+    "${PYTHON}" scripts/fetch-native-bindings.py
 else
     echo "==> Skipping cross-platform native bindings (--skip-deps)"
 fi
@@ -118,12 +110,25 @@ done
 
 echo "==> Creating release archives..."
 
+REPO_ROOT="$(cd ../.. && pwd)"
+PHOTON_WASM="$(find "$REPO_ROOT/node_modules" -name photon_rs_bg.wasm -path '*photon-node*' -print -quit)"
+if [[ -z "$PHOTON_WASM" || ! -f "$PHOTON_WASM" ]]; then
+    echo "Could not find photon_rs_bg.wasm under $REPO_ROOT/node_modules (bun/npm layout)."
+    exit 1
+fi
+KOFFI_PKG="$(find "$REPO_ROOT/node_modules" -path '*/node_modules/koffi/package.json' -print -quit)"
+if [[ -z "$KOFFI_PKG" || ! -f "$KOFFI_PKG" ]]; then
+    echo "Could not find koffi under $REPO_ROOT/node_modules."
+    exit 1
+fi
+KOFFI_ROOT="$(dirname "$KOFFI_PKG")"
+
 # Copy shared files to each platform directory
 for platform in "${PLATFORMS[@]}"; do
     cp package.json binaries/$platform/
     cp README.md binaries/$platform/
     cp CHANGELOG.md binaries/$platform/
-    cp ../../node_modules/@silvia-odwyer/photon-node/photon_rs_bg.wasm binaries/$platform/
+    cp "$PHOTON_WASM" binaries/$platform/
     mkdir -p binaries/$platform/theme
     cp dist/modes/interactive/theme/*.json binaries/$platform/theme/
     cp -r dist/core/export-html binaries/$platform/
@@ -133,9 +138,9 @@ for platform in "${PLATFORMS[@]}"; do
     # Copy koffi native module for Windows (needed for VT input support)
     if [[ "$platform" == "windows-x64" ]]; then
         mkdir -p binaries/$platform/node_modules/koffi/build/koffi/win32_x64
-        cp ../../node_modules/koffi/index.js binaries/$platform/node_modules/koffi/
-        cp ../../node_modules/koffi/package.json binaries/$platform/node_modules/koffi/
-        cp ../../node_modules/koffi/build/koffi/win32_x64/koffi.node binaries/$platform/node_modules/koffi/build/koffi/win32_x64/
+        cp "$KOFFI_ROOT/index.js" binaries/$platform/node_modules/koffi/
+        cp "$KOFFI_ROOT/package.json" binaries/$platform/node_modules/koffi/
+        cp "$KOFFI_ROOT/build/koffi/win32_x64/koffi.node" binaries/$platform/node_modules/koffi/build/koffi/win32_x64/
     fi
 done
 
@@ -148,9 +153,10 @@ for platform in "${PLATFORMS[@]}"; do
         echo "Creating pi-$platform.zip..."
         (cd $platform && zip -r ../pi-$platform.zip .)
     else
-        # Unix platforms (tar.gz) - use wrapper directory for mise compatibility
+        # Unix (tar.gz): flat root (pi, docs, …) so GitHub/mise extract into the version dir
+        # without strip_components; same shape as the Windows zip.
         echo "Creating pi-$platform.tar.gz..."
-        mv $platform pi && tar -czf pi-$platform.tar.gz pi && mv pi $platform
+        tar -czf pi-$platform.tar.gz -C "$platform" .
     fi
 done
 
@@ -161,7 +167,7 @@ for platform in "${PLATFORMS[@]}"; do
     if [[ "$platform" == "windows-x64" ]]; then
         mkdir -p $platform && (cd $platform && unzip -q ../pi-$platform.zip)
     else
-        tar -xzf pi-$platform.tar.gz && mv pi $platform
+        mkdir -p $platform && tar -xzf pi-$platform.tar.gz -C $platform
     fi
 done
 
