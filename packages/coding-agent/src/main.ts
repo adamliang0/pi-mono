@@ -472,6 +472,40 @@ export interface MainOptions {
 	extensionFactories?: ExtensionFactory[];
 }
 
+async function promptForMissingSessionCwd(
+	issue: SessionCwdIssue,
+	settingsManager: SettingsManager,
+): Promise<string | undefined> {
+	initTheme(settingsManager.getTheme());
+	setKeybindings(KeybindingsManager.create());
+
+	return new Promise((resolve) => {
+		const ui = new TUI(new ProcessTerminal(), settingsManager.getShowHardwareCursor());
+		ui.setClearOnShrink(settingsManager.getClearOnShrink());
+
+		let settled = false;
+		const finish = (result: string | undefined) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			ui.stop();
+			resolve(result);
+		};
+
+		const selector = new ExtensionSelectorComponent(
+			formatMissingSessionCwdPrompt(issue),
+			["Continue", "Cancel"],
+			(option) => finish(option === "Continue" ? issue.fallbackCwd : undefined),
+			() => finish(undefined),
+			{ tui: ui },
+		);
+		ui.addChild(selector);
+		ui.setFocus(selector);
+		ui.start();
+	});
+}
+
 export async function main(args: string[], options?: MainOptions) {
 	resetTimings();
 	const offlineMode = args.includes("--offline") || isTruthyEnvFlag(process.env.PI_OFFLINE);
