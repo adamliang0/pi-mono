@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+
+- Added optional MiniMax native Text Chat v2 (`M2-her` on API `minimax`). MiniMax recommends the Anthropic-compatible route (`anthropic-messages` on `minimax` / `minimax-cn`) for supported coding models; see their [Anthropic API compatibility](https://platform.minimax.io/docs/api-reference/text-anthropic-api) docs.
+
+### Fixed
+
+- Fixed OpenAI-compatible chat completions for OpenRouter: assistant `tool_calls` now always include a string `function.arguments` (default `"{}"` when missing) so replayed or partial tool calls do not trigger `400` `invalid params, function name or parameters is empty (2013)`; tool definitions omit the non-standard `strict` field for OpenRouter and normalize empty parameter schemas to a minimal JSON Schema object.
+
 ## [0.65.2] - 2026-04-05
 
 ## [0.65.1] - 2026-04-05

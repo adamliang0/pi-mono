@@ -34,6 +34,10 @@
 			"types": "./dist/providers/mistral.d.ts",
 			"import": "./dist/providers/mistral.js"
 		},
+		"./minimax": {
+			"types": "./dist/providers/minimax.d.ts",
+			"import": "./dist/providers/minimax.js"
+		},
 		"./openai-codex-responses": {
 			"types": "./dist/providers/openai-codex-responses.d.ts",
 			"import": "./dist/providers/openai-codex-responses.js"
@@ -78,6 +82,7 @@
 		"@mistralai/mistralai": "2.1.2",
 		"@sinclair/typebox": "^0.34.49",
 		"@smithy/node-http-handler": "^4.5.1",
+		"ai": "^6.0.146",
 		"ajv": "^8.18.0",
 		"ajv-formats": "^3.0.1",
 		"chalk": "^5.6.2",
