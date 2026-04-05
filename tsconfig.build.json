@@ -1,0 +1,11 @@
+{
+	"files": [],
+	"references": [
+		{ "path": "./packages/ai/tsconfig.build.json" },
+		{ "path": "./packages/tui/tsconfig.build.json" },
+		{ "path": "./packages/agent/tsconfig.build.json" },
+		{ "path": "./packages/pods/tsconfig.build.json" },
+		{ "path": "./packages/coding-agent/tsconfig.build.json" },
+		{ "path": "./packages/mom/tsconfig.build.json" }
+	]
+}

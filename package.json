@@ -8,7 +8,8 @@
     ],
     "scripts": {
         "clean": "bun run clean --workspaces",
-        "build": "turbo build",
+        "build": "turbo build && bun scripts/compile-pi-to-bin.mjs",
+        "build:ts": "tsgo -b tsconfig.build.json",
         "dev": "turbo dev",
         "dev:tsc": "turbo dev:tsc",
         "check": "biome check --write --error-on-warnings . && tsgo --noEmit && bun run check:browser-smoke && cd packages/web-ui && bun run check",

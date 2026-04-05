@@ -17,6 +17,9 @@
 #     pi-linux-x64.tar.gz
 #     pi-linux-arm64.tar.gz
 #     pi-windows-x64.zip
+#   bin/pi (repo root, gitignored)
+#     Copy of the built binary for the current host OS/arch when that platform
+#     was included in this run (skipped on unsupported hosts or mismatched --platform).
 
 set -euo pipefail
 
@@ -173,3 +176,52 @@ echo "Extracted directories for testing:"
 for platform in "${PLATFORMS[@]}"; do
     echo "  binaries/$platform/pi"
 done
+
+# Install host binary to repo-root bin/ (copy; leaves binaries/<platform> intact)
+REPO_ROOT="$(cd ../../.. && pwd)"
+HOST_OS="$(uname -s)"
+HOST_ARCH="$(uname -m)"
+HOST_PLATFORM=""
+case "$HOST_OS" in
+    Darwin)
+        case "$HOST_ARCH" in
+            arm64) HOST_PLATFORM="darwin-arm64" ;;
+            x86_64) HOST_PLATFORM="darwin-x64" ;;
+        esac
+        ;;
+    Linux)
+        case "$HOST_ARCH" in
+            aarch64|arm64) HOST_PLATFORM="linux-arm64" ;;
+            x86_64|amd64) HOST_PLATFORM="linux-x64" ;;
+        esac
+        ;;
+esac
+
+if [[ -z "$HOST_PLATFORM" ]]; then
+    echo ""
+    echo "==> Skipping bin/: host OS/arch not mapped ($HOST_OS / $HOST_ARCH)"
+else
+    HOST_BUILT=false
+    for platform in "${PLATFORMS[@]}"; do
+        if [[ "$platform" == "$HOST_PLATFORM" ]]; then
+            HOST_BUILT=true
+            break
+        fi
+    done
+    if [[ "$HOST_BUILT" == "false" ]]; then
+        echo ""
+        echo "==> Skipping bin/: this run did not build $HOST_PLATFORM (current host)"
+    else
+        mkdir -p "$REPO_ROOT/bin"
+        if [[ "$HOST_PLATFORM" == "windows-x64" ]]; then
+            cp "$HOST_PLATFORM/pi.exe" "$REPO_ROOT/bin/pi.exe"
+            echo ""
+            echo "==> Installed $REPO_ROOT/bin/pi.exe"
+        else
+            cp "$HOST_PLATFORM/pi" "$REPO_ROOT/bin/pi"
+            chmod +x "$REPO_ROOT/bin/pi"
+            echo ""
+            echo "==> Installed $REPO_ROOT/bin/pi"
+        fi
+    fi
+fi
