@@ -170,6 +170,11 @@ For non-standard auth, create utility (e.g., `bedrock-utils.ts`) with credential
 - `packages/ai/README.md`: Add to providers table, document options/auth, add env vars
 - `packages/ai/CHANGELOG.md`: Add entry under `## [Unreleased]`
 
+## Web UI build (`packages/web-ui`)
+
+- **`lucide` vs `@mariozechner/mini-lit`**: `mini-lit` depends on `lucide@^0.544.0` and types `icon()` against that package’s `IconNode`. If `web-ui` (or `example/`) pins a different major (e.g. `lucide@1.x`), `tsc` fails with TS2345 (`IconNode` / `SVGProps` index signature mismatch). Keep `lucide` on the same line as `mini-lit` unless `mini-lit` ships typings for a newer `lucide`.
+- **Tailwind v4 CLI**: `src/app.css` uses `@import "tailwindcss"`. Declare `tailwindcss` as a **direct** `devDependency` of `web-ui` (same major as `@tailwindcss/cli`). Relying only on the CLI’s nested `tailwindcss` often breaks resolution (`Can't resolve 'tailwindcss'`).
+
 ## Releasing
 
 **Lockstep versioning**: All packages always share the same version number. Every release updates all packages together.
