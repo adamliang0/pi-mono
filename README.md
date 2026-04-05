@@ -1,15 +1,3 @@
-<!-- OSS_WEEKEND_START -->
-# 🏖️ OSS Weekend
-
-**Issue tracker reopens Monday, April 13, 2026.**
-
-OSS weekend runs Thursday, April 2, 2026 through Monday, April 13, 2026. New issues and PRs from unapproved contributors are auto-closed during this time. Approved contributors can still open issues and PRs if something is genuinely urgent, but please keep that to pressing matters only. For support, join [Discord](https://discord.com/invite/3cU7Bz4UPx).
-
-> _Current focus: at the moment i'm deep in refactoring internals, and need to focus._
-<!-- OSS_WEEKEND_END -->
-
----
-
 <p align="center">
   <a href="https://shittycodingagent.ai">
     <img src="https://shittycodingagent.ai/logo.svg" alt="pi logo" width="128">
@@ -63,19 +51,87 @@ I regularly publish my own `pi-mono` work sessions here:
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [AGENTS.md](AGENTS.md) for project-specific rules (for both humans and agents).
 
+## Prerequisites
+
+- **Bun** — version pinned in root `package.json` as `packageManager` (install via [oven-sh/bun](https://github.com/oven-sh/bun)).
+- **Node.js** `>= 20` (required by root `engines`; CI also uses Node for cross-platform native installs during binary builds).
+
 ## Development
 
-This fork uses `bun` as the main pacakge manager.
+This repo uses **Bun** as the package manager and script runner.
 
 ```bash
-npm install          # Install all dependencies
-npm run build        # Build all packages
-npm run check        # Lint, format, and type check
-./test.sh            # Run tests (skips LLM-dependent tests without API keys)
-./pi-test.sh         # Run pi from sources (can be run from any directory)
+bun install          # Install all workspace dependencies
+bun run build        # Build all packages (Turbo + pi CLI compile step)
+bun run check        # Lint, format, typecheck, browser smoke, web-ui checks
+bun run test         # Run tests across packages (turbo; some suites need API keys)
+./pi-test.sh         # Run the coding agent from source (any cwd)
 ```
 
-> **Note:** `npm run check` requires `npm run build` to be run first. The web-ui package uses `tsc` which needs compiled `.d.ts` files from dependencies.
+Other useful scripts:
+
+```bash
+bun run build:ts     # TypeScript project references only (no full Turbo graph)
+bun run clean        # Clean outputs across workspaces
+```
+
+## Build
+
+1. **`bun install`** — installs workspaces under `packages/*` and `packages/web-ui/example`.
+2. **`bun run build`** — runs `turbo build` for the monorepo, then `scripts/compile-pi-to-bin.mjs` to produce the `pi` CLI artifact used by local runs and packaging.
+
+**Pre-publish gate** (also what `bun run publish` runs via `prepublishOnly`): `bun run clean && bun run build && bun run check`.
+
+**Cross-platform `pi` archives** (macOS/Linux/Windows) for GitHub Releases:
+
+```bash
+./scripts/build-binaries.sh              # all platforms (needs Node for optional deps)
+./scripts/build-binaries.sh --platform darwin-arm64   # single platform
+./scripts/build-binaries.sh --skip-deps               # skip cross-platform npm installs
+```
+
+Artifacts land in `packages/coding-agent/binaries/` (`pi-*.tar.gz` / `pi-*.zip`). CI mirrors this in [.github/workflows/build-binaries.yml](.github/workflows/build-binaries.yml).
+
+## Release
+
+All publishable packages stay on **one lockstep semver** (same version in every `packages/*/package.json`). Bump type follows [AGENTS.md](AGENTS.md): `patch` for fixes and additions, `minor` for API-breaking changes (this repo does not ship separate “major” product lines—still use `major` when you need that semver jump).
+
+### Changelogs
+
+Before cutting a release, ensure each affected package has entries under `## [Unreleased]` in `packages/*/CHANGELOG.md` (format and attribution rules in [AGENTS.md](AGENTS.md)). The release automation **finalizes** those sections into a dated `## [x.y.z]` block; it does not write feature text for you.
+
+### Full release (version bump, tag, npm publish)
+
+Requires a **clean** git working tree.
+
+```bash
+bun run release:patch    # or :minor / :major → runs scripts/release.mjs
+```
+
+That script: bumps versions (`bun run version:*` + `scripts/sync-versions.js`), rewrites `[Unreleased]` changelogs to the new version, commits and tags `vX.Y.Z`, runs `bun run publish` (unless skipped), adds fresh `[Unreleased]` sections, commits again, and pushes branch + tag.
+
+**Binaries-only** (no npm): set `SKIP_NPM_PUBLISH=1` when invoking the same flow, e.g. `SKIP_NPM_PUBLISH=1 bun run release:patch`. You still need a plan for **uploading** `packages/coding-agent/binaries/*` if you are not using the GitHub workflow below.
+
+Optional env overrides: `RELEASE_REMOTE`, `RELEASE_BRANCH` (see header comment in `scripts/release.mjs`).
+
+### GitHub Release with prebuilt binaries (CI)
+
+Use the **Release (GitHub binaries)** workflow: [.github/workflows/release-github.yml](.github/workflows/release-github.yml) (`workflow_dispatch`, choose patch/minor/major). It bumps versions, finalizes changelogs, commits, tags, runs `./scripts/build-binaries.sh`, creates or updates a **GitHub Release** with the archive assets, adds the next `[Unreleased]` block, and pushes. **No npm publish.**
+
+Pushes performed with `GITHUB_TOKEN` do not trigger other workflows; this workflow uploads assets itself. **Tags pushed manually** from your machine still trigger **Build Binaries** ([.github/workflows/build-binaries.yml](.github/workflows/build-binaries.yml)) on `v*` tags.
+
+## Maintaining the repo
+
+| Task | What to run / where |
+|------|----------------------|
+| Day-to-day quality gate | `bun run check` (required before commits that touch code; see [AGENTS.md](AGENTS.md)) |
+| Full test sweep | `bun run test`; contributors also use `./test.sh` per [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Lockstep versions after manual edits | `node scripts/sync-versions.js` if you ever set versions by hand (normally `bun run version:*` handles it) |
+| Changelog discipline | Only edit `## [Unreleased]`; never rewrite released version sections ([AGENTS.md](AGENTS.md)) |
+| CI | [ci.yml](.github/workflows/ci.yml) on pushes/PRs; binary builds on `v*` tags or manual dispatch |
+| Per-package docs | `packages/*/README.md` (e.g. coding agent install and provider setup) |
+
+For detailed automation rules (fork vs upstream, OSS weekend, issue labels, hooks), use [AGENTS.md](AGENTS.md).
 
 ## License
 

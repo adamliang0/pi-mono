@@ -69,6 +69,24 @@ When closing issues via commit:
 - If the user approves: create a feature branch, pull PR, rebase on main, apply adjustments, commit, merge into main, push, close PR, and leave a comment in the user's tone
 - You never open PRs yourself. We work in feature branches until everything is according to the user's requirements, then merge into main, and push.
 
+## Fork vs upstream
+
+This worktree is a **fork**. Remotes: `origin` → `github.com/adamliang0/pi-mono`, `upstream` → `github.com/badlogic/pi-mono`. Sync with `git fetch upstream` then rebase or merge `upstream/main` as appropriate; use `git log upstream/main..HEAD` / `git diff upstream/main...HEAD` to see what is fork-only.
+
+**Treat as fork-local unless upstream adopts the same change:** `@adamliang0/*` package names and publish metadata, root `package.json` scripts that use `bun`, README branding and fork notes, and any CI or automation aimed at this repo. Several `packages/*/package.json` `repository.url` fields still point at `badlogic/pi-mono`; changing them is a deliberate fork decision, not something to “fix” while rebasing. Changelog attribution in this file uses `badlogic/pi-mono` issue URLs—keep using the tracker that actually owns the issue when you write entries.
+
+On conflict during a rebase/merge from `upstream`, do not blindly take upstream for those fork-local areas. Prefer `git rerere` if you sync often. Same parallel-agent rules as below: no `reset --hard`, no force-push, no sweeping `git add`.
+
+### Versioning with upstream
+
+All packages stay **lockstep** on one semver (`packages/*/package.json` + root). Upstream bumps the same way; after a rebase you may see **version conflicts**. Resolve by picking a single version: **must be strictly greater than the last version you published** from this fork (npm and/or GitHub Releases). If you fast-forward to upstream’s release commit and your tree matches their version, **bump at least patch** before your next fork release so artifacts monotonically increase. Do not publish duplicate versions.
+
+### GitHub binary release (fork CI)
+
+Workflow **Release (GitHub binaries)** (`.github/workflows/release-github.yml`): `workflow_dispatch`, choose patch/minor/major. It runs **Bun** (`bun install`, `bun run version:*`, `bun run build` via `build-binaries.sh`), finalizes `## [Unreleased]` changelogs, commits, tags, builds archives, **`gh release create` + upload**, adds the next `[Unreleased]`, pushes to the default branch and the tag. **No npm publish** (use `SKIP_NPM_PUBLISH=1` with `node scripts/release.mjs` locally if you want the same behavior offline).
+
+Pushes use `GITHUB_TOKEN`; they **do not** trigger `build-binaries.yml` (GitHub limitation), which is why this workflow performs the release upload itself. **Manually pushed tags** still trigger `build-binaries.yml`. If branch protection blocks `github-actions[bot]` pushes, allow the bot or use a PAT checkout with `contents: write` and push with that token instead.
+
 ## Tools
 - GitHub CLI for issues/PRs
 - Add package labels to issues/PRs: pkg:agent, pkg:ai, pkg:coding-agent, pkg:mom, pkg:pods, pkg:tui, pkg:web-ui
@@ -187,13 +205,13 @@ For non-standard auth, create utility (e.g., `bedrock-utils.ts`) with credential
 
 1. **Update CHANGELOGs**: Ensure all changes since last release are documented in the `[Unreleased]` section of each affected package's CHANGELOG.md
 
-2. **Run release script**:
+2. **Run release script** (uses **Bun** for version bump and publish):
    ```bash
-   npm run release:patch    # Fixes and additions
-   npm run release:minor    # API breaking changes
+   bun run release:patch    # Fixes and additions
+   bun run release:minor    # API breaking changes
    ```
 
-The script handles: version bump, CHANGELOG finalization, commit, tag, publish, and adding new `[Unreleased]` sections.
+The script handles: version bump, CHANGELOG finalization, commit, tag, npm publish (set `SKIP_NPM_PUBLISH=1` to skip), and adding new `[Unreleased]` sections. For **GitHub binaries only**, use the **Release (GitHub binaries)** workflow or `SKIP_NPM_PUBLISH=1 bun run release:patch` (you still need a way to upload assets if not using that workflow).
 
 ## **CRITICAL** Tool Usage Rules **CRITICAL**
 - NEVER use sed/cat to read a file or a range of a file. Always use the read tool (use offset + limit for ranged reads).
