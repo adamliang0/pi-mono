@@ -1,11 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type {
-	CacheControlEphemeral,
 	ContentBlockParam,
 	MessageCreateParamsStreaming,
 	MessageParam,
-	RawMessageStreamEvent,
 } from "@anthropic-ai/sdk/resources/messages.js";
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import { getEnvApiKey } from "../env-api-keys.js";
 import { calculateCost } from "../models.js";
 import type {
@@ -27,8 +27,8 @@ import type {
 	ToolResultMessage,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
-import { headersToRecord } from "../utils/headers.js";
-import { parseJsonWithRepair, parseStreamingJson } from "../utils/json-parse.js";
+import { isPlainObject } from "../utils/is-plain-object.js";
+import { parseStreamingJson } from "../utils/json-parse.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 
 import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copilot-headers.js";
@@ -52,7 +52,7 @@ function resolveCacheRetention(cacheRetention?: CacheRetention): CacheRetention 
 function getCacheControl(
 	baseUrl: string,
 	cacheRetention?: CacheRetention,
-): { retention: CacheRetention; cacheControl?: CacheControlEphemeral } {
+): { retention: CacheRetention; cacheControl?: { type: "ephemeral"; ttl?: "1h" } } {
 	const retention = resolveCacheRetention(cacheRetention);
 	if (retention === "none") {
 		return { retention };
@@ -155,9 +155,7 @@ function convertContentBlocks(content: (TextContent | ImageContent)[]):
 	return blocks;
 }
 
-export type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
-
-export type AnthropicThinkingDisplay = "summarized" | "omitted";
+export type AnthropicEffort = "low" | "medium" | "high" | "max";
 
 export interface AnthropicOptions extends StreamOptions {
 	/**
@@ -172,28 +170,15 @@ export interface AnthropicOptions extends StreamOptions {
 	 */
 	thinkingBudgetTokens?: number;
 	/**
-	 * Effort level for adaptive thinking (Opus 4.6+ and Sonnet 4.6).
+	 * Effort level for adaptive thinking (Opus 4.6 and Sonnet 4.6).
 	 * Controls how much thinking Claude allocates:
 	 * - "max": Always thinks with no constraints (Opus 4.6 only)
-	 * - "xhigh": Highest reasoning level (Opus 4.7)
 	 * - "high": Always thinks, deep reasoning (default)
 	 * - "medium": Moderate thinking, may skip for simple queries
 	 * - "low": Minimal thinking, skips for simple tasks
 	 * Ignored for older models.
 	 */
 	effort?: AnthropicEffort;
-	/**
-	 * Controls how thinking content is returned in API responses.
-	 * - "summarized": Thinking blocks contain summarized thinking text (default here).
-	 * - "omitted": Thinking blocks return an empty thinking field; the encrypted
-	 *   signature still travels back for multi-turn continuity. Use for faster
-	 *   time-to-first-text-token when your UI does not surface thinking.
-	 *
-	 * Note: Anthropic's API default for Claude Opus 4.7 and Claude Mythos Preview
-	 * is "omitted". We default to "summarized" here to keep behavior consistent
-	 * with older Claude 4 models. Set this explicitly to "omitted" to opt in.
-	 */
-	thinkingDisplay?: AnthropicThinkingDisplay;
 	interleavedThinking?: boolean;
 	toolChoice?: "auto" | "any" | "none" | { type: "tool"; name: string };
 	/**
@@ -212,176 +197,6 @@ function mergeHeaders(...headerSources: (Record<string, string> | undefined)[]):
 		}
 	}
 	return merged;
-}
-
-interface ServerSentEvent {
-	event: string | null;
-	data: string;
-	raw: string[];
-}
-
-interface SseDecoderState {
-	event: string | null;
-	data: string[];
-	raw: string[];
-}
-
-function flushSseEvent(state: SseDecoderState): ServerSentEvent | null {
-	if (!state.event && state.data.length === 0) {
-		return null;
-	}
-
-	const event: ServerSentEvent = {
-		event: state.event,
-		data: state.data.join("\n"),
-		raw: [...state.raw],
-	};
-	state.event = null;
-	state.data = [];
-	state.raw = [];
-	return event;
-}
-
-function decodeSseLine(line: string, state: SseDecoderState): ServerSentEvent | null {
-	if (line === "") {
-		return flushSseEvent(state);
-	}
-
-	state.raw.push(line);
-	if (line.startsWith(":")) {
-		return null;
-	}
-
-	const delimiterIndex = line.indexOf(":");
-	const fieldName = delimiterIndex === -1 ? line : line.slice(0, delimiterIndex);
-	let value = delimiterIndex === -1 ? "" : line.slice(delimiterIndex + 1);
-	if (value.startsWith(" ")) {
-		value = value.slice(1);
-	}
-
-	if (fieldName === "event") {
-		state.event = value;
-	} else if (fieldName === "data") {
-		state.data.push(value);
-	}
-
-	return null;
-}
-
-function nextLineBreakIndex(text: string): number {
-	const carriageReturnIndex = text.indexOf("\r");
-	const newlineIndex = text.indexOf("\n");
-	if (carriageReturnIndex === -1) {
-		return newlineIndex;
-	}
-	if (newlineIndex === -1) {
-		return carriageReturnIndex;
-	}
-	return Math.min(carriageReturnIndex, newlineIndex);
-}
-
-function consumeLine(text: string): { line: string; rest: string } | null {
-	const lineBreakIndex = nextLineBreakIndex(text);
-	if (lineBreakIndex === -1) {
-		return null;
-	}
-
-	let nextIndex = lineBreakIndex + 1;
-	if (text[lineBreakIndex] === "\r" && text[nextIndex] === "\n") {
-		nextIndex += 1;
-	}
-
-	return {
-		line: text.slice(0, lineBreakIndex),
-		rest: text.slice(nextIndex),
-	};
-}
-
-async function* iterateSseMessages(
-	body: ReadableStream<Uint8Array>,
-	signal?: AbortSignal,
-): AsyncGenerator<ServerSentEvent> {
-	const reader = body.getReader();
-	const decoder = new TextDecoder();
-	const state: SseDecoderState = { event: null, data: [], raw: [] };
-	let buffer = "";
-
-	try {
-		while (true) {
-			if (signal?.aborted) {
-				throw new Error("Request was aborted");
-			}
-
-			const { value, done } = await reader.read();
-			if (done) {
-				break;
-			}
-
-			buffer += decoder.decode(value, { stream: true });
-			let consumed = consumeLine(buffer);
-			while (consumed) {
-				buffer = consumed.rest;
-				const event = decodeSseLine(consumed.line, state);
-				if (event) {
-					yield event;
-				}
-				consumed = consumeLine(buffer);
-			}
-		}
-
-		buffer += decoder.decode();
-		let consumed = consumeLine(buffer);
-		while (consumed) {
-			buffer = consumed.rest;
-			const event = decodeSseLine(consumed.line, state);
-			if (event) {
-				yield event;
-			}
-			consumed = consumeLine(buffer);
-		}
-
-		if (buffer.length > 0) {
-			const event = decodeSseLine(buffer, state);
-			if (event) {
-				yield event;
-			}
-		}
-
-		const trailingEvent = flushSseEvent(state);
-		if (trailingEvent) {
-			yield trailingEvent;
-		}
-	} finally {
-		reader.releaseLock();
-	}
-}
-
-async function* iterateAnthropicEvents(
-	response: Response,
-	signal?: AbortSignal,
-): AsyncGenerator<RawMessageStreamEvent> {
-	if (!response.body) {
-		throw new Error("Attempted to iterate over an Anthropic response with no body");
-	}
-
-	for await (const sse of iterateSseMessages(response.body, signal)) {
-		if (!sse.event || sse.event === "ping") {
-			continue;
-		}
-
-		if (sse.event === "error") {
-			throw new Error(sse.data);
-		}
-
-		try {
-			yield parseJsonWithRepair<RawMessageStreamEvent>(sse.data);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			throw new Error(
-				`Could not parse Anthropic SSE event ${sse.event}: ${message}; data=${sse.data}; raw=${sse.raw.join("\\n")}`,
-			);
-		}
-	}
 }
 
 export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOptions> = (
@@ -444,16 +259,13 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 			if (nextParams !== undefined) {
 				params = nextParams as MessageCreateParamsStreaming;
 			}
-			const response = await client.messages
-				.create({ ...params, stream: true }, { signal: options?.signal })
-				.asResponse();
-			await options?.onResponse?.({ status: response.status, headers: headersToRecord(response.headers) }, model);
+			const anthropicStream = client.messages.stream({ ...params, stream: true }, { signal: options?.signal });
 			stream.push({ type: "start", partial: output });
 
 			type Block = (ThinkingContent | TextContent | (ToolCall & { partialJson: string })) & { index: number };
 			const blocks = output.content as Block[];
 
-			for await (const event of iterateAnthropicEvents(response, options?.signal)) {
+			for await (const event of anthropicStream) {
 				if (event.type === "message_start") {
 					output.responseId = event.message.id;
 					// Capture initial token usage from message_start event
@@ -575,9 +387,7 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 							});
 						} else if (block.type === "toolCall") {
 							block.arguments = parseStreamingJson(block.partialJson);
-							// Finalize in-place and strip the scratch buffer so replay only
-							// carries parsed arguments.
-							delete (block as { partialJson?: string }).partialJson;
+							delete (block as any).partialJson;
 							stream.push({
 								type: "toolcall_end",
 								contentIndex: index,
@@ -622,11 +432,7 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 			stream.push({ type: "done", reason: output.stopReason, message: output });
 			stream.end();
 		} catch (error) {
-			for (const block of output.content) {
-				delete (block as { index?: number }).index;
-				// partialJson is only a streaming scratch buffer; never persist it.
-				delete (block as { partialJson?: string }).partialJson;
-			}
+			for (const block of output.content) delete (block as any).index;
 			output.stopReason = options?.signal?.aborted ? "aborted" : "error";
 			output.errorMessage = error instanceof Error ? error.message : JSON.stringify(error);
 			stream.push({ type: "error", reason: output.stopReason, error: output });
@@ -638,15 +444,13 @@ export const streamAnthropic: StreamFunction<"anthropic-messages", AnthropicOpti
 };
 
 /**
- * Check if a model supports adaptive thinking (Opus 4.6+, Sonnet 4.6)
+ * Check if a model supports adaptive thinking (Opus 4.6 and Sonnet 4.6)
  */
 function supportsAdaptiveThinking(modelId: string): boolean {
-	// Adaptive-thinking model IDs (with or without date suffix)
+	// Opus 4.6 and Sonnet 4.6 model IDs (with or without date suffix)
 	return (
 		modelId.includes("opus-4-6") ||
 		modelId.includes("opus-4.6") ||
-		modelId.includes("opus-4-7") ||
-		modelId.includes("opus-4.7") ||
 		modelId.includes("sonnet-4-6") ||
 		modelId.includes("sonnet-4.6")
 	);
@@ -654,7 +458,7 @@ function supportsAdaptiveThinking(modelId: string): boolean {
 
 /**
  * Map ThinkingLevel to Anthropic effort levels for adaptive thinking.
- * Note: effort "max" is only valid on Opus 4.6, while Opus 4.7 supports "xhigh".
+ * Note: effort "max" is only valid on Opus 4.6.
  */
 function mapThinkingLevelToEffort(level: SimpleStreamOptions["reasoning"], modelId: string): AnthropicEffort {
 	switch (level) {
@@ -667,13 +471,7 @@ function mapThinkingLevelToEffort(level: SimpleStreamOptions["reasoning"], model
 		case "high":
 			return "high";
 		case "xhigh":
-			if (modelId.includes("opus-4-6") || modelId.includes("opus-4.6")) {
-				return "max";
-			}
-			if (modelId.includes("opus-4-7") || modelId.includes("opus-4.7")) {
-				return "xhigh";
-			}
-			return "high";
+			return modelId.includes("opus-4-6") || modelId.includes("opus-4.6") ? "max" : "high";
 		default:
 			return "high";
 	}
@@ -762,7 +560,7 @@ function createClient(
 		return { client, isOAuthToken: false };
 	}
 
-	const betaFeatures: string[] = [];
+	const betaFeatures = ["fine-grained-tool-streaming-2025-05-14"];
 	if (needsInterleavedBeta) {
 		betaFeatures.push("interleaved-thinking-2025-05-14");
 	}
@@ -778,7 +576,7 @@ function createClient(
 				{
 					accept: "application/json",
 					"anthropic-dangerous-direct-browser-access": "true",
-					"anthropic-beta": ["claude-code-20250219", "oauth-2025-04-20", ...betaFeatures].join(","),
+					"anthropic-beta": `claude-code-20250219,oauth-2025-04-20,${betaFeatures.join(",")}`,
 					"user-agent": `claude-cli/${claudeCodeVersion}`,
 					"x-app": "cli",
 				},
@@ -799,7 +597,7 @@ function createClient(
 			{
 				accept: "application/json",
 				"anthropic-dangerous-direct-browser-access": "true",
-				...(betaFeatures.length > 0 ? { "anthropic-beta": betaFeatures.join(",") } : {}),
+				"anthropic-beta": betaFeatures.join(","),
 			},
 			model.headers,
 			optionsHeaders,
@@ -856,34 +654,24 @@ function buildParams(
 	}
 
 	if (context.tools) {
-		params.tools = convertTools(context.tools, isOAuthToken, cacheControl);
+		params.tools = convertTools(context.tools, isOAuthToken);
 	}
 
-	// Configure thinking mode: adaptive (Opus 4.6+ and Sonnet 4.6),
+	// Configure thinking mode: adaptive (Opus 4.6 and Sonnet 4.6),
 	// budget-based (older models), or explicitly disabled.
 	if (model.reasoning) {
 		if (options?.thinkingEnabled) {
-			// Default to "summarized" so Opus 4.7 and Mythos Preview behave like
-			// older Claude 4 models (whose API default is also "summarized").
-			const display: AnthropicThinkingDisplay = options.thinkingDisplay ?? "summarized";
 			if (supportsAdaptiveThinking(model.id)) {
-				// Adaptive thinking: Claude decides when and how much to think.
-				params.thinking = { type: "adaptive", display };
+				// Adaptive thinking: Claude decides when and how much to think
+				params.thinking = { type: "adaptive" };
 				if (options.effort) {
-					// The Anthropic SDK types can lag newly supported effort values such as "xhigh".
-					params.output_config =
-						options.effort === "xhigh"
-							? ({ effort: options.effort } as unknown as NonNullable<
-									MessageCreateParamsStreaming["output_config"]
-								>)
-							: { effort: options.effort };
+					params.output_config = { effort: options.effort };
 				}
 			} else {
 				// Budget-based thinking for older models
 				params.thinking = {
 					type: "enabled",
 					budget_tokens: options.thinkingBudgetTokens || 1024,
-					display,
 				};
 			}
 		} else if (options?.thinkingEnabled === false) {
@@ -918,7 +706,7 @@ function convertMessages(
 	messages: Message[],
 	model: Model<"anthropic-messages">,
 	isOAuthToken: boolean,
-	cacheControl?: CacheControlEphemeral,
+	cacheControl?: { type: "ephemeral"; ttl?: "1h" },
 ): MessageParam[] {
 	const params: MessageParam[] = [];
 
@@ -954,7 +742,8 @@ function convertMessages(
 						};
 					}
 				});
-				const filteredBlocks = blocks.filter((b) => {
+				let filteredBlocks = !model?.input.includes("image") ? blocks.filter((b) => b.type !== "image") : blocks;
+				filteredBlocks = filteredBlocks.filter((b) => {
 					if (b.type === "text") {
 						return b.text.trim().length > 0;
 					}
@@ -1078,26 +867,67 @@ function convertMessages(
 	return params;
 }
 
-function convertTools(
-	tools: Tool[],
-	isOAuthToken: boolean,
-	cacheControl?: CacheControlEphemeral,
-): Anthropic.Messages.Tool[] {
+/** Subset of JSON Schema / TypeBox object shape we map to Anthropic `input_schema`. */
+const anthropicToolParameterSource = Type.Object(
+	{
+		properties: Type.Optional(Type.Record(Type.String(), Type.Any())),
+		required: Type.Optional(Type.Array(Type.String())),
+	},
+	{ additionalProperties: true },
+);
+
+function extractAnthropicInputSchemaFields(parameters: unknown): {
+	properties: Record<string, unknown>;
+	required: string[];
+} {
+	const empty: { properties: Record<string, unknown>; required: string[] } = {
+		properties: {},
+		required: [],
+	};
+	if (parameters === undefined || parameters === null) {
+		return empty;
+	}
+	if (!Value.Check(anthropicToolParameterSource, parameters)) {
+		return empty;
+	}
+	if (!isPlainObject(parameters)) {
+		return empty;
+	}
+
+	const properties: Record<string, unknown> = {};
+	const required: string[] = [];
+
+	const rawProps = parameters.properties;
+	if (isPlainObject(rawProps)) {
+		Object.assign(properties, rawProps);
+	}
+
+	const rawReq = parameters.required;
+	if (Array.isArray(rawReq)) {
+		for (const x of rawReq) {
+			if (typeof x === "string") {
+				required.push(x);
+			}
+		}
+	}
+
+	return { properties, required };
+}
+
+function convertTools(tools: Tool[], isOAuthToken: boolean): Anthropic.Messages.Tool[] {
 	if (!tools) return [];
 
-	return tools.map((tool, index) => {
-		const schema = tool.parameters as { properties?: unknown; required?: string[] };
+	return tools.map((tool) => {
+		const { properties, required } = extractAnthropicInputSchemaFields(tool.parameters);
 
 		return {
 			name: isOAuthToken ? toClaudeCodeName(tool.name) : tool.name,
 			description: tool.description,
-			eager_input_streaming: true,
 			input_schema: {
-				type: "object",
-				properties: schema.properties ?? {},
-				required: schema.required ?? [],
+				type: "object" as const,
+				properties,
+				required,
 			},
-			...(cacheControl && index === tools.length - 1 ? { cache_control: cacheControl } : {}),
 		};
 	});
 }

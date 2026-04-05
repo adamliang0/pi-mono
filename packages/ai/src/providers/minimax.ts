@@ -1,3 +1,5 @@
+import { Type } from "@sinclair/typebox";
+import { Value } from "@sinclair/typebox/value";
 import { getEnvApiKey } from "../env-api-keys.js";
 import { calculateCost } from "../models.js";
 import type {
@@ -13,6 +15,7 @@ import type {
 	UserMessage,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
+import { isPlainObject } from "../utils/is-plain-object.js";
 import { sanitizeSurrogates } from "../utils/sanitize-unicode.js";
 import { parseSseJsonObjectRecordsFromBody } from "../utils/sse-json-event-stream.js";
 import { buildBaseOptions } from "./simple-options.js";
@@ -20,6 +23,51 @@ import { transformMessages } from "./transform-messages.js";
 
 const CHAT_COMPLETION_V2_PATH = "/v1/text/chatcompletion_v2";
 const MAX_COMPLETION_TOKENS_CAP = 2048;
+
+const minimaxRequestBody = Type.Object(
+	{
+		model: Type.String(),
+		messages: Type.Array(Type.Any()),
+		stream: Type.Boolean(),
+		max_completion_tokens: Type.Number(),
+		temperature: Type.Optional(Type.Number()),
+		top_p: Type.Optional(Type.Number()),
+	},
+	{ additionalProperties: true },
+);
+
+const minimaxSseBaseResp = Type.Object(
+	{
+		base_resp: Type.Optional(
+			Type.Object(
+				{
+					status_code: Type.Optional(Type.Number()),
+					status_msg: Type.Optional(Type.String()),
+				},
+				{ additionalProperties: true },
+			),
+		),
+	},
+	{ additionalProperties: true },
+);
+
+const minimaxUsageChunk = Type.Object(
+	{
+		prompt_tokens: Type.Optional(Type.Number()),
+		completion_tokens: Type.Optional(Type.Number()),
+		total_tokens: Type.Optional(Type.Number()),
+	},
+	{ additionalProperties: true },
+);
+
+const minimaxStreamChoice = Type.Object(
+	{
+		finish_reason: Type.Optional(Type.String()),
+		delta: Type.Optional(Type.Object({ content: Type.Optional(Type.String()) }, { additionalProperties: true })),
+		message: Type.Optional(Type.Object({ content: Type.Optional(Type.String()) }, { additionalProperties: true })),
+	},
+	{ additionalProperties: true },
+);
 
 /**
  * Options for MiniMax Text Chat v2 (`chatcompletion_v2`, `M2-her`).
@@ -202,16 +250,18 @@ function applyUsageChunk(output: AssistantMessage, model: Model<"minimax">, usag
 }
 
 function readBaseRespError(obj: Record<string, unknown>): string | undefined {
-	const base = obj.base_resp;
-	if (!base || typeof base !== "object") {
+	if (!Value.Check(minimaxSseBaseResp, obj) || !isPlainObject(obj)) {
 		return undefined;
 	}
-	const rec = base as Record<string, unknown>;
-	const code = rec.status_code;
+	const base = obj.base_resp;
+	if (!isPlainObject(base)) {
+		return undefined;
+	}
+	const code = base.status_code;
 	if (typeof code !== "number" || code === 0) {
 		return undefined;
 	}
-	const msg = typeof rec.status_msg === "string" ? rec.status_msg : "";
+	const msg = typeof base.status_msg === "string" ? base.status_msg : "";
 	return msg ? `MiniMax API error (${code}): ${msg}` : `MiniMax API error (${code})`;
 }
 
@@ -254,7 +304,12 @@ export const streamMiniMax: StreamFunction<"minimax", MiniMaxOptions> = (
 
 			const nextBody = await options?.onPayload?.(body, model);
 			if (nextBody !== undefined) {
-				body = nextBody as Record<string, unknown>;
+				if (!Value.Check(minimaxRequestBody, nextBody) || !isPlainObject(nextBody)) {
+					throw new Error(
+						"MiniMax onPayload must return a plain object with model (string), messages (array), stream (boolean), and max_completion_tokens (number)",
+					);
+				}
+				body = nextBody;
 			}
 
 			const headers: Record<string, string> = {
@@ -322,8 +377,8 @@ export const streamMiniMax: StreamFunction<"minimax", MiniMaxOptions> = (
 				}
 
 				const usage = raw.usage;
-				if (usage && typeof usage === "object") {
-					applyUsageChunk(output, model, usage as Record<string, unknown>);
+				if (Value.Check(minimaxUsageChunk, usage) && isPlainObject(usage)) {
+					applyUsageChunk(output, model, usage);
 				}
 
 				const choices = raw.choices;
@@ -331,7 +386,10 @@ export const streamMiniMax: StreamFunction<"minimax", MiniMaxOptions> = (
 					continue;
 				}
 
-				const choice = choices[0] as Record<string, unknown>;
+				const choice = choices[0];
+				if (!Value.Check(minimaxStreamChoice, choice) || !isPlainObject(choice)) {
+					continue;
+				}
 
 				if (typeof choice.finish_reason === "string") {
 					const mapped = mapFinishReason(choice.finish_reason);
@@ -342,9 +400,8 @@ export const streamMiniMax: StreamFunction<"minimax", MiniMaxOptions> = (
 				}
 
 				const delta = choice.delta;
-				if (delta && typeof delta === "object") {
-					const d = delta as Record<string, unknown>;
-					const piece = d.content;
+				if (isPlainObject(delta)) {
+					const piece = delta.content;
 					if (typeof piece === "string" && piece.length > 0) {
 						const block = ensureTextBlock();
 						textBuffer += piece;
@@ -359,9 +416,8 @@ export const streamMiniMax: StreamFunction<"minimax", MiniMaxOptions> = (
 				}
 
 				const message = choice.message;
-				if (message && typeof message === "object") {
-					const m = message as Record<string, unknown>;
-					const full = m.content;
+				if (isPlainObject(message)) {
+					const full = message.content;
 					if (typeof full === "string" && full.length > 0 && textBuffer.length === 0) {
 						const block = ensureTextBlock();
 						textBuffer = full;

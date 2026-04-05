@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Anthropic-compatible tool conversion (MiniMax, Amazon Bedrock, etc.) no longer throws when a tool has missing or non-object `parameters`; empty `input_schema` is sent instead. Eligible shapes are validated with TypeBox `Value.Check` before reading `properties` / `required`.
+- MiniMax Text Chat v2 stream parsing and `onPayload` bodies use TypeBox `Value.Check` for SSE chunks (usage, choices, `base_resp`) and the outbound request shape instead of unchecked casts.
+
 ## [0.66.0] - 2026-04-05
 
 ### Added
