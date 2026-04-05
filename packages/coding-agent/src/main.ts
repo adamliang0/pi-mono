@@ -5,7 +5,8 @@
  * createAgentSession() options. The SDK does the heavy lifting.
  */
 
-import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { type ImageContent, modelsAreEqual, supportsXhigh } from "@mariozechner/pi-ai";
 import { ProcessTerminal, setKeybindings, TUI } from "@mariozechner/pi-tui";
@@ -15,7 +16,7 @@ import { processFileArguments } from "./cli/file-processor.js";
 import { buildInitialMessage } from "./cli/initial-message.js";
 import { listModels } from "./cli/list-models.js";
 import { selectSession } from "./cli/session-picker.js";
-import { getAgentDir, getModelsPath, VERSION } from "./config.js";
+import { CONFIG_DIR_NAME, getAgentDir, getModelsPath, VERSION } from "./config.js";
 import { type CreateAgentSessionRuntimeFactory, createAgentSessionRuntime } from "./core/agent-session-runtime.js";
 import {
 	type AgentSessionRuntimeDiagnostic,
@@ -45,6 +46,7 @@ import { InteractiveMode, runPrintMode, runRpcMode } from "./modes/index.js";
 import { ExtensionSelectorComponent } from "./modes/interactive/components/extension-selector.js";
 import { initTheme, stopThemeWatcher } from "./modes/interactive/theme/theme.js";
 import { handleConfigCommand, handlePackageCommand } from "./package-manager-cli.js";
+import { parseFrontmatter } from "./utils/frontmatter.js";
 import { isLocalPath } from "./utils/paths.js";
 
 /**
@@ -131,6 +133,53 @@ async function prepareInitialMessage(
 		fileImages: images,
 		stdinContent,
 	});
+}
+
+function resolveStartupPromptTemplateMessage(
+	sessionCwd: string,
+	agentDir: string,
+	settingsManager: SettingsManager,
+	parsed: Args,
+	stdinContent: string | undefined,
+	existingInitial: string | undefined,
+	sessionManager: SessionManager,
+): string | undefined {
+	if (existingInitial !== undefined) {
+		return undefined;
+	}
+	if (stdinContent !== undefined) {
+		return undefined;
+	}
+	if (parsed.fileArgs.length > 0) {
+		return undefined;
+	}
+	if (sessionManager.buildSessionContext().messages.length > 0) {
+		return undefined;
+	}
+
+	const name = settingsManager.getStartupPromptTemplate();
+	if (!name || name.trim() === "") {
+		return undefined;
+	}
+
+	const candidates = [
+		join(sessionCwd, CONFIG_DIR_NAME, "prompts", `${name}.md`),
+		join(agentDir, "prompts", `${name}.md`),
+	];
+
+	for (const filePath of candidates) {
+		if (!existsSync(filePath)) {
+			continue;
+		}
+		const raw = readFileSync(filePath, "utf-8");
+		const { body } = parseFrontmatter<Record<string, string>>(raw);
+		const text = body.trim();
+		if (text.length === 0) {
+			continue;
+		}
+		return text;
+	}
+	return undefined;
 }
 
 /** Result from resolving a session argument */
@@ -643,11 +692,25 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 	time("readPipedStdin");
 
-	const { initialMessage, initialImages } = await prepareInitialMessage(
+	let { initialMessage, initialImages } = await prepareInitialMessage(
 		parsed,
 		settingsManager.getImageAutoResize(),
 		stdinContent,
 	);
+	if (appMode === "interactive") {
+		const fromTemplate = resolveStartupPromptTemplateMessage(
+			sessionManager.getCwd(),
+			agentDir,
+			settingsManager,
+			parsed,
+			stdinContent,
+			initialMessage,
+			sessionManager,
+		);
+		if (fromTemplate !== undefined) {
+			initialMessage = fromTemplate;
+		}
+	}
 	time("prepareInitialMessage");
 	initTheme(settingsManager.getTheme(), appMode === "interactive");
 	time("initTheme");
