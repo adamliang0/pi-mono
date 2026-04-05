@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Unix release `.tar.gz` archives use a flat root (same as the Windows zip) so installs that extract into a single directory—e.g. mise’s `github:` backend—place the `pi` binary at `…/<version>/pi` without `strip_components`. If you previously set `strip_components = 1` for older tarballs, remove it for releases built with this layout.
+- `scripts/build-binaries.sh` resolves `photon_rs_bg.wasm` and `koffi` via `find` under the repo `node_modules` tree so local builds work with Bun’s `.bun` install layout (not only a flat `node_modules/<pkg>` path).
+
 ## [0.66.0] - 2026-04-05
 
 ## [0.65.2] - 2026-04-05
