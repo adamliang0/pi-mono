@@ -34,6 +34,10 @@ import { buildCopilotDynamicHeaders, hasCopilotVisionInput } from "./github-copi
 import { buildBaseOptions, clampReasoning } from "./simple-options.js";
 import { transformMessages } from "./transform-messages.js";
 
+// Streaming uses the OpenAI SDK iterator from `client.chat.completions.create` (parsed
+// `ChatCompletionChunk` objects), not raw SSE. For AI SDK `parseJsonEventStream` + Web
+// Streams `pipeThrough`, see `utils/sse-json-event-stream.ts` (e.g. Codex HTTP responses).
+
 /**
  * Check if conversation messages contain tool calls or tool results.
  * This is needed because Anthropic (via proxy) requires the tools param
@@ -618,14 +622,22 @@ export function convertMessages(
 
 			const toolCalls = msg.content.filter((b) => b.type === "toolCall") as ToolCall[];
 			if (toolCalls.length > 0) {
-				assistantMsg.tool_calls = toolCalls.map((tc) => ({
-					id: tc.id,
-					type: "function" as const,
-					function: {
-						name: tc.name,
-						arguments: JSON.stringify(tc.arguments),
-					},
-				}));
+				assistantMsg.tool_calls = toolCalls.map((tc) => {
+					let argumentsJson: string;
+					if (tc.arguments != null) {
+						argumentsJson = JSON.stringify(tc.arguments);
+					} else {
+						argumentsJson = "{}";
+					}
+					return {
+						id: tc.id,
+						type: "function" as const,
+						function: {
+							name: tc.name,
+							arguments: argumentsJson,
+						},
+					};
+				});
 				const reasoningDetails = toolCalls
 					.filter((tc) => tc.thoughtSignature)
 					.map((tc) => {
@@ -727,20 +739,37 @@ export function convertMessages(
 	return params;
 }
 
+function normalizeOpenAIToolParameters(parameters: unknown): Record<string, unknown> {
+	if (parameters == null || typeof parameters !== "object" || Array.isArray(parameters)) {
+		return { type: "object", properties: {} };
+	}
+	const keys = Object.keys(parameters as object);
+	if (keys.length === 0) {
+		return { type: "object", properties: {} };
+	}
+	return JSON.parse(JSON.stringify(parameters)) as Record<string, unknown>;
+}
+
 function convertTools(
 	tools: Tool[],
 	compat: Required<OpenAICompletionsCompat>,
 ): OpenAI.Chat.Completions.ChatCompletionTool[] {
-	return tools.map((tool) => ({
-		type: "function",
-		function: {
-			name: tool.name,
+	const out: OpenAI.Chat.Completions.ChatCompletionTool[] = [];
+	for (const tool of tools) {
+		if (typeof tool.name !== "string" || tool.name.trim().length === 0) {
+			continue;
+		}
+		const fn: OpenAI.Chat.Completions.ChatCompletionFunctionTool["function"] = {
+			name: tool.name.trim(),
 			description: tool.description,
-			parameters: tool.parameters as any, // TypeBox already generates JSON Schema
-			// Only include strict if provider supports it. Some reject unknown fields.
-			...(compat.supportsStrictMode !== false && { strict: false }),
-		},
-	}));
+			parameters: normalizeOpenAIToolParameters(tool.parameters),
+		};
+		if (compat.supportsStrictMode !== false) {
+			fn.strict = false;
+		}
+		out.push({ type: "function", function: fn });
+	}
+	return out;
 }
 
 function parseChunkUsage(
@@ -862,7 +891,7 @@ function detectCompat(model: Model<"openai-completions">): Required<OpenAIComple
 		openRouterRouting: {},
 		vercelGatewayRouting: {},
 		zaiToolStream: false,
-		supportsStrictMode: true,
+		supportsStrictMode: !(provider === "openrouter" || baseUrl.includes("openrouter.ai")),
 	};
 }
 

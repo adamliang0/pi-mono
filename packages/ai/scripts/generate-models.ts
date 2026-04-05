@@ -1087,6 +1087,45 @@ async function generateModels() {
 	];
 	allModels.push(...codexModels);
 
+	// MiniMax native Text Chat v2 (M2-her); separate from Anthropic-compatible route on the same providers.
+	const minimaxTextChatModels: Model<"minimax">[] = [
+		{
+			id: "M2-her",
+			name: "M2-her (Text Chat v2)",
+			api: "minimax",
+			provider: "minimax",
+			baseUrl: "https://api.minimax.io",
+			reasoning: false,
+			input: ["text"],
+			cost: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 2048,
+		},
+		{
+			id: "M2-her",
+			name: "M2-her (Text Chat v2)",
+			api: "minimax",
+			provider: "minimax-cn",
+			baseUrl: "https://api.minimaxi.com",
+			reasoning: false,
+			input: ["text"],
+			cost: {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+			},
+			contextWindow: 128000,
+			maxTokens: 2048,
+		},
+	];
+	allModels.push(...minimaxTextChatModels);
+
 	// Add missing Grok models
 	if (!allModels.some(m => m.provider === "xai" && m.id === "grok-code-fast-1")) {
 		allModels.push({
@@ -1121,10 +1160,10 @@ async function generateModels() {
 			cost: {
 				// we dont know about the costs because OpenRouter auto routes to different models
 				// and then charges you for the underlying used model
-				input:0,
-				output:0,
-				cacheRead:0,
-				cacheWrite:0,
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
 			},
 			contextWindow: 2000000,
 			maxTokens: 30000,

@@ -1015,6 +1015,7 @@ In Node.js environments, you can set environment variables to avoid passing API 
 | Vercel AI Gateway | `AI_GATEWAY_API_KEY` |
 | zAI | `ZAI_API_KEY` |
 | MiniMax | `MINIMAX_API_KEY` |
+| MiniMax CN | `MINIMAX_CN_API_KEY` |
 | OpenCode Zen / OpenCode Go | `OPENCODE_API_KEY` |
 | Kimi For Coding | `KIMI_API_KEY` |
 | GitHub Copilot | `COPILOT_GITHUB_TOKEN` or `GH_TOKEN` or `GITHUB_TOKEN` |
@@ -1031,6 +1032,12 @@ const response = await complete(model, context, {
   apiKey: 'sk-different-key'
 });
 ```
+
+#### MiniMax APIs
+
+MiniMax documents the **[Anthropic-compatible API](https://platform.minimax.io/docs/api-reference/text-anthropic-api)** as the main integration: with the Anthropic SDK you set `ANTHROPIC_BASE_URL` to `https://api.minimax.io/anthropic` (or `https://api.minimaxi.com/anthropic` in China) and your MiniMax key as `ANTHROPIC_API_KEY`. With pi-ai, use **`MINIMAX_API_KEY` / `MINIMAX_CN_API_KEY`** and **`anthropic-messages`** on providers `minimax` / `minimax-cn` (for example `getModel("minimax", "MiniMax-M2.7")`) — same HTTP API, different env wiring. That path supports text, tools, tool results, and thinking; image and document content blocks are not supported upstream.
+
+The separate native [Text Chat v2](https://platform.minimax.io/docs/api-reference/text-chat) endpoint (`M2-her` only) uses the same pi-ai API id **`minimax`** (distinct model id `M2-her`); it is text-only and does not support tools. For agents and coding, prefer the Anthropic-compatible models above.
 
 #### Antigravity Version Override
 

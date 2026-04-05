@@ -110,6 +110,46 @@ describe("openai-completions tool_choice", () => {
 		expect(params.tools?.length ?? 0).toBeGreaterThan(0);
 	});
 
+	it("omits strict on OpenRouter models by default", async () => {
+		const baseModel = getModel("openrouter", "deepseek/deepseek-chat")!;
+		const model = { ...baseModel, api: "openai-completions" as const };
+		const tools: Tool[] = [
+			{
+				name: "ping",
+				description: "Ping tool",
+				parameters: Type.Object({
+					ok: Type.Boolean(),
+				}),
+			},
+		];
+		let payload: unknown;
+
+		await streamSimple(
+			model,
+			{
+				messages: [
+					{
+						role: "user",
+						content: "Call ping",
+						timestamp: Date.now(),
+					},
+				],
+				tools,
+			},
+			{
+				apiKey: "test",
+				onPayload: (params: unknown) => {
+					payload = params;
+				},
+			} as unknown as Parameters<typeof streamSimple>[2],
+		).result();
+
+		const params = (payload ?? mockState.lastParams) as { tools?: Array<{ function?: Record<string, unknown> }> };
+		const tool = params.tools?.[0]?.function;
+		expect(tool).toBeTruthy();
+		expect("strict" in (tool ?? {})).toBe(false);
+	});
+
 	it("omits strict when compat disables strict mode", async () => {
 		const { compat: _compat, ...baseModel } = getModel("openai", "gpt-4o-mini")!;
 		const model = {
