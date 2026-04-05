@@ -44,7 +44,7 @@ export interface Keybindings {
 export type Keybinding = keyof Keybindings;
 
 export interface KeybindingDefinition {
-	defaultKeys: KeyId | KeyId[];
+	defaultKeys: KeyId | readonly KeyId[];
 	description?: string;
 }
 
@@ -138,7 +138,7 @@ export interface KeybindingConflict {
 	keybindings: string[];
 }
 
-function normalizeKeys(keys: KeyId | KeyId[] | undefined): KeyId[] {
+function normalizeKeys(keys: KeyId | readonly KeyId[] | undefined): KeyId[] {
 	if (keys === undefined) return [];
 	const keyList = Array.isArray(keys) ? keys : [keys];
 	const seen = new Set<KeyId>();
