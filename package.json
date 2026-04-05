@@ -14,8 +14,6 @@
         "dev:tsc": "turbo dev:tsc",
         "check": "biome check --write --error-on-warnings . && tsgo --noEmit && bun run check:browser-smoke && cd packages/web-ui && bun run check",
         "check:browser-smoke": "bun scripts/check-browser-smoke.mjs",
-        "profile:tui": "node scripts/profile-coding-agent-node.mjs --mode tui",
-        "profile:rpc": "node scripts/profile-coding-agent-node.mjs --mode rpc",
         "test": "turbo test",
         "version:patch": "node scripts/bump-lockstep-version.mjs patch && node scripts/sync-versions.js && rm -rf node_modules packages/*/node_modules bun.lock && bun install",
         "version:minor": "node scripts/bump-lockstep-version.mjs minor && node scripts/sync-versions.js && rm -rf node_modules packages/*/node_modules bun.lock && bun install",
