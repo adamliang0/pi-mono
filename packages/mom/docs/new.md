@@ -176,7 +176,6 @@ interface UserInfo {
 MomAgent wraps `AgentSession` from coding-agent. Agent is platform-agnostic; it just forwards events to the adapter.
 
 ```typescript
-import { type AgentSessionEvent } from "@mariozechner/pi-coding-agent";
 
 interface MomAgent {
   /**
@@ -645,9 +644,7 @@ Mom runs bash commands inside a sandbox (Docker container), but sometimes you ne
 
 ```typescript
 // data/tools/gmail/index.ts
-import type { MomCustomTool, ToolAPI } from "@mariozechner/pi-mom";
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
 
 const tool: MomCustomTool = {
   name: "gmail",
@@ -888,9 +885,7 @@ function schemaToSimpleJson(schema: TSchema): object {
 
 ```typescript
 // data/tools/gmail/index.ts
-import type { MomCustomTool, ToolAPI } from "@mariozechner/pi-mom";
 import { Type } from "@sinclair/typebox";
-import { StringEnum } from "@mariozechner/pi-ai";
 import Imap from "imap";
 import nodemailer from "nodemailer";
 
@@ -922,7 +917,6 @@ export default async function(api: ToolAPI): Promise<MomCustomTool> {
 
 ### Loading
 
-Tools are loaded via jiti. They can import any 3rd party dependencies (install in the tool directory). Imports of `@mariozechner/pi-ai` and `@mariozechner/pi-mom` are aliased to the running mom bundle.
 
 **Live reload**: In dev mode, tools are watched and reloaded on change. No restart needed.
 

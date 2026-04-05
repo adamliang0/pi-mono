@@ -1,4 +1,4 @@
-# @mariozechner/pi-ai
+# @adamliang0/pi-ai
 
 Unified LLM API with automatic model discovery, provider configuration, token and cost tracking, and simple context persistence and hand-off to other models mid-session.
 
@@ -73,15 +73,12 @@ Unified LLM API with automatic model discovery, provider configuration, token an
 ## Installation
 
 ```bash
-npm install @mariozechner/pi-ai
 ```
 
-TypeBox exports are re-exported from `@mariozechner/pi-ai`: `Type`, `Static`, and `TSchema`.
 
 ## Quick Start
 
 ```typescript
-import { Type, getModel, stream, complete, Context, Tool, StringEnum } from '@mariozechner/pi-ai';
 
 // Fully typed with auto-complete support for both providers and models
 const model = getModel('openai', 'gpt-4o-mini');
@@ -207,7 +204,6 @@ Tools enable LLMs to interact with external systems. This library uses TypeBox s
 ### Defining Tools
 
 ```typescript
-import { Type, Tool, StringEnum } from '@mariozechner/pi-ai';
 
 // Define tool parameters with TypeBox
 const weatherTool: Tool = {
@@ -318,6 +314,7 @@ for await (const event of s) {
 ```
 
 **Important notes about partial tool arguments:**
+
 - During `toolcall_delta` events, `arguments` contains the best-effort parse of partial JSON
 - Fields may be missing or incomplete - always check for existence before use
 - String values may be truncated mid-word
@@ -333,7 +330,6 @@ When using `agentLoop`, tool arguments are automatically validated against your 
 When implementing your own tool execution loop with `stream()` or `complete()`, use `validateToolCall` to validate arguments before passing them to your tools:
 
 ```typescript
-import { stream, validateToolCall, Tool } from '@mariozechner/pi-ai';
 
 const tools: Tool[] = [weatherTool, calculatorTool];
 const s = stream(model, { messages, tools });
@@ -387,7 +383,6 @@ Models with vision capabilities can process images. You can check if a model sup
 
 ```typescript
 import { readFileSync } from 'fs';
-import { getModel, complete } from '@mariozechner/pi-ai';
 
 const model = getModel('openai', 'gpt-4o-mini');
 
@@ -424,7 +419,6 @@ Many models support thinking/reasoning capabilities where they can show their in
 ### Unified Interface (streamSimple/completeSimple)
 
 ```typescript
-import { getModel, streamSimple, completeSimple } from '@mariozechner/pi-ai';
 
 // Many models across providers support thinking/reasoning
 const model = getModel('anthropic', 'claude-sonnet-4-20250514');
@@ -462,7 +456,6 @@ for (const block of response.content) {
 For fine-grained control, use the provider-specific options:
 
 ```typescript
-import { getModel, complete } from '@mariozechner/pi-ai';
 
 // OpenAI Reasoning (o1, o3, gpt-5)
 const openaiModel = getModel('openai', 'gpt-5-mini');
@@ -551,7 +544,6 @@ if (message.stopReason === 'error' || message.stopReason === 'aborted') {
 The abort signal allows you to cancel in-progress requests. Aborted requests have `stopReason === 'aborted'`:
 
 ```typescript
-import { getModel, stream } from '@mariozechner/pi-ai';
 
 const model = getModel('openai', 'gpt-4o-mini');
 const controller = new AbortController();
@@ -726,6 +718,7 @@ Notes:
 ### Providers and Models
 
 A **provider** offers models through a specific API. For example:
+
 - **Anthropic** models use the `anthropic-messages` API
 - **Google** models use the `google-generative-ai` API
 - **OpenAI** models use the `openai-responses` API
@@ -735,7 +728,6 @@ A **provider** offers models through a specific API. For example:
 ### Querying Providers and Models
 
 ```typescript
-import { getProviders, getModels, getModel } from '@mariozechner/pi-ai';
 
 // Get all available providers
 const providers = getProviders();
@@ -761,7 +753,6 @@ console.log(`Using ${model.name} via ${model.api} API`);
 You can create custom models for local inference servers or custom endpoints:
 
 ```typescript
-import { Model, stream } from '@mariozechner/pi-ai';
 
 // Example: Ollama using OpenAI-compatible API
 const ollamaModel: Model<'openai-completions'> = {
@@ -879,7 +870,6 @@ If `compat` is not set, the library falls back to URL-based detection. If `compa
 Models are typed by their API, which keeps the model metadata accurate. Provider-specific option types are enforced when you call the provider functions directly. The generic `stream` and `complete` functions accept `StreamOptions` with additional provider fields.
 
 ```typescript
-import { streamAnthropic, type AnthropicOptions } from '@mariozechner/pi-ai';
 
 // TypeScript knows this is an Anthropic model
 const claude = getModel('anthropic', 'claude-sonnet-4-20250514');
@@ -908,7 +898,6 @@ When messages from one provider are sent to a different provider, the library au
 ### Example: Multi-Provider Conversation
 
 ```typescript
-import { getModel, complete, Context } from '@mariozechner/pi-ai';
 
 // Start with Claude
 const claude = getModel('anthropic', 'claude-sonnet-4-20250514');
@@ -937,12 +926,14 @@ const geminiResponse = await complete(gemini, context);
 ### Provider Compatibility
 
 All providers can handle messages from other providers, including:
+
 - Text content
 - Tool calls and tool results (including images in tool results)
 - Thinking/reasoning blocks (transformed to tagged text for cross-provider compatibility)
 - Aborted messages with partial content
 
 This enables flexible workflows where you can:
+
 - Start with a fast model for initial responses
 - Switch to a more capable model for complex reasoning
 - Use specialized models for specific tasks
@@ -953,7 +944,6 @@ This enables flexible workflows where you can:
 The `Context` object can be easily serialized and deserialized using standard JSON methods, making it simple to persist conversations, implement chat history, or transfer contexts between services:
 
 ```typescript
-import { Context, getModel, complete } from '@mariozechner/pi-ai';
 
 // Create and use a context
 const context: Context = {
@@ -990,7 +980,6 @@ const continuation = await complete(newModel, restored);
 The library supports browser environments. You must pass the API key explicitly since environment variables are not available in browsers:
 
 ```typescript
-import { getModel, complete } from '@mariozechner/pi-ai';
 
 // API key must be passed explicitly in browser
 const model = getModel('anthropic', 'claude-3-5-haiku-20241022');
@@ -1007,7 +996,6 @@ const response = await complete(model, {
 ### Browser Compatibility Notes
 
 - Amazon Bedrock (`bedrock-converse-stream`) is not supported in browser environments.
-- OAuth login flows are not supported in browser environments. Use the `@mariozechner/pi-ai/oauth` entry point in Node.js.
 - In browser builds, Bedrock can still appear in model lists. Calls to Bedrock models fail at runtime.
 - Use a server-side proxy or backend service if you need Bedrock or OAuth-based auth from a web app.
 
@@ -1072,7 +1060,6 @@ This only affects direct API calls to `api.anthropic.com` and `api.openai.com`. 
 ### Checking Environment Variables
 
 ```typescript
-import { getEnvApiKey } from '@mariozechner/pi-ai';
 
 // Check if an API key is set in environment variables
 const key = getEnvApiKey('openai');  // checks OPENAI_API_KEY
@@ -1113,7 +1100,6 @@ export GOOGLE_APPLICATION_CREDENTIALS="/path/to/service-account.json"
 ```
 
 ```typescript
-import { getModel, complete } from '@mariozechner/pi-ai';
 
 (async () => {
   const model = getModel('google-vertex', 'gemini-2.5-flash');
@@ -1136,16 +1122,12 @@ Official docs: [Application Default Credentials](https://cloud.google.com/docs/a
 The quickest way to authenticate:
 
 ```bash
-npx @mariozechner/pi-ai login              # interactive provider selection
-npx @mariozechner/pi-ai login anthropic    # login to specific provider
-npx @mariozechner/pi-ai list               # list available providers
 ```
 
 Credentials are saved to `auth.json` in the current directory.
 
 ### Programmatic OAuth
 
-The library provides login and token refresh functions via the `@mariozechner/pi-ai/oauth` entry point. Credential storage is the caller's responsibility.
 
 ```typescript
 import {
@@ -1163,13 +1145,11 @@ import {
   // Types
   type OAuthProvider,  // 'anthropic' | 'openai-codex' | 'github-copilot' | 'google-gemini-cli' | 'google-antigravity'
   type OAuthCredentials,
-} from '@mariozechner/pi-ai/oauth';
 ```
 
 ### Login Flow Example
 
 ```typescript
-import { loginGitHubCopilot } from '@mariozechner/pi-ai/oauth';
 import { writeFileSync } from 'fs';
 
 const credentials = await loginGitHubCopilot({
@@ -1193,8 +1173,6 @@ writeFileSync('auth.json', JSON.stringify(auth, null, 2));
 Use `getOAuthApiKey()` to get an API key, automatically refreshing if expired:
 
 ```typescript
-import { getModel, complete } from '@mariozechner/pi-ai';
-import { getOAuthApiKey } from '@mariozechner/pi-ai/oauth';
 import { readFileSync, writeFileSync } from 'fs';
 
 // Load your stored credentials
@@ -1253,7 +1231,6 @@ Create a new provider file (for example `amazon-bedrock.ts`) that exports:
 - Register the API with `registerApiProvider()`
 - Add a package subpath export in `package.json` for the provider module (`./dist/providers/<provider>.js`)
 - Add lazy loader wrappers in `src/providers/register-builtins.ts`, do not statically import provider implementation modules there
-- Add any root-level `export type` re-exports in `src/index.ts` that should remain available from `@mariozechner/pi-ai`
 - Add credential detection in `env-api-keys.ts` for the new provider
 - Ensure `streamSimple` handles auth lookup via `getEnvApiKey()` or provider-specific auth
 
