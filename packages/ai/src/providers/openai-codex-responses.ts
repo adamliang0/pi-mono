@@ -27,6 +27,7 @@ import type {
 	StreamOptions,
 } from "../types.js";
 import { AssistantMessageEventStream } from "../utils/event-stream.js";
+import { parseSseJsonObjectRecords } from "../utils/sse-json-event-stream.js";
 import { convertResponsesMessages, convertResponsesTools, processResponsesStream } from "./openai-responses-shared.js";
 import { buildBaseOptions, clampReasoning } from "./simple-options.js";
 
@@ -367,7 +368,7 @@ async function processStream(
 	stream: AssistantMessageEventStream,
 	model: Model<"openai-codex-responses">,
 ): Promise<void> {
-	await processResponsesStream(mapCodexEvents(parseSSE(response)), output, stream, model);
+	await processResponsesStream(mapCodexEvents(parseSseJsonObjectRecords(response)), output, stream, model);
 }
 
 async function* mapCodexEvents(events: AsyncIterable<Record<string, unknown>>): AsyncGenerator<ResponseStreamEvent> {
@@ -402,53 +403,6 @@ async function* mapCodexEvents(events: AsyncIterable<Record<string, unknown>>): 
 function normalizeCodexStatus(status: unknown): CodexResponseStatus | undefined {
 	if (typeof status !== "string") return undefined;
 	return CODEX_RESPONSE_STATUSES.has(status as CodexResponseStatus) ? (status as CodexResponseStatus) : undefined;
-}
-
-// ============================================================================
-// SSE Parsing
-// ============================================================================
-
-async function* parseSSE(response: Response): AsyncGenerator<Record<string, unknown>> {
-	if (!response.body) return;
-
-	const reader = response.body.getReader();
-	const decoder = new TextDecoder();
-	let buffer = "";
-
-	try {
-		while (true) {
-			const { done, value } = await reader.read();
-			if (done) break;
-			buffer += decoder.decode(value, { stream: true });
-
-			let idx = buffer.indexOf("\n\n");
-			while (idx !== -1) {
-				const chunk = buffer.slice(0, idx);
-				buffer = buffer.slice(idx + 2);
-
-				const dataLines = chunk
-					.split("\n")
-					.filter((l) => l.startsWith("data:"))
-					.map((l) => l.slice(5).trim());
-				if (dataLines.length > 0) {
-					const data = dataLines.join("\n").trim();
-					if (data && data !== "[DONE]") {
-						try {
-							yield JSON.parse(data);
-						} catch {}
-					}
-				}
-				idx = buffer.indexOf("\n\n");
-			}
-		}
-	} finally {
-		try {
-			await reader.cancel();
-		} catch {}
-		try {
-			reader.releaseLock();
-		} catch {}
-	}
 }
 
 // ============================================================================

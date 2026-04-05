@@ -6,6 +6,7 @@ import type {
 	Context,
 	Model,
 	OpenAICompletionsCompat,
+	ToolCall,
 	ToolResultMessage,
 	Usage,
 } from "../src/types.js";
@@ -95,5 +96,43 @@ describe("openai-completions convertMessages", () => {
 			(part) => part?.type === "image_url",
 		);
 		expect(imageParts.length).toBe(2);
+	});
+
+	it("serializes assistant tool_calls with {} when arguments are undefined (OpenRouter-compatible)", () => {
+		const baseModel = getModel("openai", "gpt-4o-mini");
+		const model: Model<"openai-completions"> = {
+			...baseModel,
+			api: "openai-completions",
+			input: ["text"],
+		};
+
+		const now = Date.now();
+		const assistantMessage: AssistantMessage = {
+			role: "assistant",
+			content: [
+				{
+					type: "toolCall",
+					id: "call-1",
+					name: "read",
+					arguments: undefined,
+				} as unknown as ToolCall,
+			],
+			api: model.api,
+			provider: model.provider,
+			model: model.id,
+			usage: emptyUsage,
+			stopReason: "toolUse",
+			timestamp: now,
+		};
+
+		const context: Context = {
+			messages: [{ role: "user", content: "Go", timestamp: now - 1 }, assistantMessage],
+		};
+
+		const messages = convertMessages(model, context, compat);
+		const assistant = messages.find((m) => m.role === "assistant") as {
+			tool_calls?: Array<{ function?: { arguments?: string } }>;
+		};
+		expect(assistant?.tool_calls?.[0]?.function?.arguments).toBe("{}");
 	});
 });
