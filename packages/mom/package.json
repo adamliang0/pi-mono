@@ -1,6 +1,6 @@
 {
 	"name": "@mariozechner/pi-mom",
-	"version": "0.66.1",
+	"version": "0.66.2",
 	"description": "Slack bot that delegates messages to the pi coding agent",
 	"type": "module",
 	"bin": {
@@ -14,7 +14,7 @@
 	],
 	"scripts": {
 		"clean": "shx rm -rf dist",
-		"build": "tsgo -b tsconfig.build.json && shx chmod +x dist/main.js",
+		"build": "tsc -b tsconfig.build.json && shx chmod +x dist/main.js",
 		"dev": "tsgo -b tsconfig.build.json --watch --preserveWatchOutput",
 		"prepublishOnly": "npm run clean && npm run build"
 	},
