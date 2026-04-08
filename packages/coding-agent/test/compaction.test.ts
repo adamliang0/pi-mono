@@ -395,6 +395,32 @@ describe("buildSessionContext", () => {
 	});
 });
 
+describe("prepareCompaction message filtering", () => {
+	it("should skip errored and aborted assistant messages from summaries", () => {
+		const user = createMessageEntry(createUserMessage("Start work"));
+		const erroredAssistant = createMessageEntry({
+			...createAssistantMessage("This failed"),
+			stopReason: "error",
+		});
+		const abortedAssistant = createMessageEntry({
+			...createAssistantMessage("This was aborted"),
+			stopReason: "aborted",
+		});
+		const finalUser = createMessageEntry(createUserMessage("Continue"));
+		const finalAssistant = createMessageEntry(createAssistantMessage("Done", createMockUsage(8000, 2000)));
+
+		const preparation = prepareCompaction([user, erroredAssistant, abortedAssistant, finalUser, finalAssistant], {
+			...DEFAULT_COMPACTION_SETTINGS,
+			keepRecentTokens: 1,
+		});
+
+		expect(preparation).toBeDefined();
+		expect(extractText(preparation!.messagesToSummarize)).toContain("Start work");
+		expect(extractText(preparation!.messagesToSummarize)).not.toContain("This failed");
+		expect(extractText(preparation!.messagesToSummarize)).not.toContain("This was aborted");
+	});
+});
+
 describe("prepareCompaction with previous compaction", () => {
 	it("should preserve kept messages across repeated compactions when they still fit", () => {
 		const u1 = createMessageEntry(createUserMessage("user msg 1 (summarized by compaction1)"));

@@ -24,6 +24,49 @@ export function createFileOps(): FileOperations {
 }
 
 /**
+ * Extract likely file paths from a bash command using simple command-specific heuristics.
+ * This is intentionally conservative and only covers common file-oriented commands.
+ */
+function extractFileOpsFromBashCommand(command: string, fileOps: FileOperations): void {
+	const readOnlyCommands = new Set(["cat", "head", "tail", "less", "more", "wc", "stat", "ls"]);
+	const modifyCommands = new Set(["rm", "touch", "mkdir", "rmdir", "chmod", "chown"]);
+	const copyCommands = new Set(["cp", "mv"]);
+	const commandPattern =
+		/(^|[;&|]{1,2})\s*(cat|head|tail|less|more|wc|stat|ls|cp|mv|rm|touch|mkdir|rmdir|chmod|chown)\s+([^;&|]+)/g;
+
+	for (const match of command.matchAll(commandPattern)) {
+		const cmd = match[2];
+		const argsText = match[3]?.trim();
+		if (!argsText) continue;
+
+		const tokens = Array.from(argsText.matchAll(/"([^"]+)"|'([^']+)'|([^\s]+)/g))
+			.map((tokenMatch) => tokenMatch[1] ?? tokenMatch[2] ?? tokenMatch[3] ?? "")
+			.map((token) => token.trim())
+			.filter((token) => token.length > 0 && !token.startsWith("-"));
+		if (tokens.length === 0) continue;
+
+		if (readOnlyCommands.has(cmd)) {
+			for (const token of tokens) {
+				fileOps.read.add(token);
+			}
+			continue;
+		}
+
+		if (modifyCommands.has(cmd)) {
+			for (const token of tokens) {
+				fileOps.edited.add(token);
+			}
+			continue;
+		}
+
+		if (copyCommands.has(cmd)) {
+			if (tokens.length >= 1) fileOps.read.add(tokens[0]);
+			if (tokens.length >= 2) fileOps.edited.add(tokens[tokens.length - 1]);
+		}
+	}
+}
+
+/**
  * Extract file operations from tool calls in an assistant message.
  */
 export function extractFileOpsFromMessage(message: AgentMessage, fileOps: FileOperations): void {
@@ -39,18 +82,22 @@ export function extractFileOpsFromMessage(message: AgentMessage, fileOps: FileOp
 		if (!args) continue;
 
 		const path = typeof args.path === "string" ? args.path : undefined;
-		if (!path) continue;
 
 		switch (block.name) {
 			case "read":
-				fileOps.read.add(path);
+				if (path) fileOps.read.add(path);
 				break;
 			case "write":
-				fileOps.written.add(path);
+				if (path) fileOps.written.add(path);
 				break;
 			case "edit":
-				fileOps.edited.add(path);
+				if (path) fileOps.edited.add(path);
 				break;
+			case "bash": {
+				const command = typeof args.command === "string" ? args.command : undefined;
+				if (command) extractFileOpsFromBashCommand(command, fileOps);
+				break;
+			}
 		}
 	}
 }
@@ -85,8 +132,14 @@ export function formatFileOperations(readFiles: string[], modifiedFiles: string[
 // Message Serialization
 // ============================================================================
 
-/** Maximum characters for a tool result in serialized summaries. */
+/** Maximum characters for a single serialized tool result in summaries. */
 const TOOL_RESULT_MAX_CHARS = 2000;
+/** Minimum characters for a single serialized tool result in summaries. */
+const TOOL_RESULT_MIN_CHARS = 500;
+/** Total character budget allocated across serialized tool results. */
+const TOOL_RESULT_TOTAL_BUDGET_CHARS = 12000;
+/** Maximum characters for a single serialized tool argument value. */
+const TOOL_ARGUMENT_MAX_CHARS = 200;
 
 /**
  * Truncate text to a maximum character length for summarization.
@@ -106,10 +159,30 @@ function truncateForSummary(text: string, maxChars: number): string {
  * Tool results are truncated to keep the summarization request within
  * reasonable token budgets. Full content is not needed for summarization.
  */
+function clamp(value: number, min: number, max: number): number {
+	return Math.min(max, Math.max(min, value));
+}
+
+function serializeToolArgumentValue(value: unknown): string {
+	const serialized = JSON.stringify(value) ?? String(value);
+	return truncateForSummary(serialized, TOOL_ARGUMENT_MAX_CHARS);
+}
+
 export function serializeConversation(messages: Message[]): string {
 	const parts: string[] = [];
+	const toolResultCount = messages.filter((message) => message.role === "toolResult").length;
+	const toolResultMaxChars = clamp(
+		Math.floor(TOOL_RESULT_TOTAL_BUDGET_CHARS / Math.max(toolResultCount, 1)),
+		TOOL_RESULT_MIN_CHARS,
+		TOOL_RESULT_MAX_CHARS,
+	);
+	let previousToolResultContent: string | undefined;
 
 	for (const msg of messages) {
+		if (msg.role !== "toolResult") {
+			previousToolResultContent = undefined;
+		}
+
 		if (msg.role === "user") {
 			const content =
 				typeof msg.content === "string"
@@ -121,26 +194,20 @@ export function serializeConversation(messages: Message[]): string {
 			if (content) parts.push(`[User]: ${content}`);
 		} else if (msg.role === "assistant") {
 			const textParts: string[] = [];
-			const thinkingParts: string[] = [];
 			const toolCalls: string[] = [];
 
 			for (const block of msg.content) {
 				if (block.type === "text") {
 					textParts.push(block.text);
-				} else if (block.type === "thinking") {
-					thinkingParts.push(block.thinking);
 				} else if (block.type === "toolCall") {
 					const args = block.arguments as Record<string, unknown>;
 					const argsStr = Object.entries(args)
-						.map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+						.map(([k, v]) => `${k}=${serializeToolArgumentValue(v)}`)
 						.join(", ");
 					toolCalls.push(`${block.name}(${argsStr})`);
 				}
 			}
 
-			if (thinkingParts.length > 0) {
-				parts.push(`[Assistant thinking]: ${thinkingParts.join("\n")}`);
-			}
 			if (textParts.length > 0) {
 				parts.push(`[Assistant]: ${textParts.join("\n")}`);
 			}
@@ -153,7 +220,11 @@ export function serializeConversation(messages: Message[]): string {
 				.map((c) => c.text)
 				.join("");
 			if (content) {
-				parts.push(`[Tool result]: ${truncateForSummary(content, TOOL_RESULT_MAX_CHARS)}`);
+				const serializedContent = truncateForSummary(content, toolResultMaxChars);
+				if (serializedContent !== previousToolResultContent) {
+					parts.push(`[Tool result]: ${serializedContent}`);
+					previousToolResultContent = serializedContent;
+				}
 			}
 		}
 	}

@@ -96,6 +96,12 @@ function getMessageFromEntryForCompaction(entry: SessionEntry): AgentMessage | u
 	if (entry.type === "compaction") {
 		return undefined;
 	}
+	if (entry.type === "message" && entry.message.role === "assistant") {
+		const assistantMessage = entry.message as AssistantMessage;
+		if (assistantMessage.stopReason === "aborted" || assistantMessage.stopReason === "error") {
+			return undefined;
+		}
+	}
 	return getMessageFromEntry(entry);
 }
 
