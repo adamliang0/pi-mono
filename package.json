@@ -7,7 +7,7 @@
         "packages/web-ui/example"
     ],
     "scripts": {
-        "clean": "bun run clean --workspaces",
+        "clean": "shx rm -rf packages/*/dist packages/web-ui/example/dist",
         "build": "turbo build && bun scripts/compile-pi-to-bin.mjs",
         "build:ts": "tsgo -b tsconfig.build.json",
         "dev": "turbo dev",
@@ -20,8 +20,8 @@
         "version:major": "node scripts/bump-lockstep-version.mjs major && node scripts/sync-versions.js && rm -rf node_modules packages/*/node_modules bun.lock && bun install",
         "version:set": "bun run version -ws",
         "prepublishOnly": "bun run clean && bun run build && bun run check",
-        "publish": "bun run prepublishOnly && bun publish -ws --access public",
-        "publish:dry": "bun run prepublishOnly && bun publish -ws --access public --dry-run",
+        "publish": "bun run prepublishOnly && for d in packages/tui packages/ai packages/agent packages/coding-agent packages/mom packages/pods packages/web-ui; do (cd \"$d\" && bun publish --access public); done",
+        "publish:dry": "bun run prepublishOnly && for d in packages/tui packages/ai packages/agent packages/coding-agent packages/mom packages/pods packages/web-ui; do (cd \"$d\" && bun publish --access public --dry-run); done",
         "release:patch": "node scripts/release.mjs patch",
         "release:minor": "node scripts/release.mjs minor",
         "release:major": "node scripts/release.mjs major",

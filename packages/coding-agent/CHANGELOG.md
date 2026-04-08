@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.66.2] - 2026-04-08
+
+### Fixed
+
+- Improved compaction and branch summarization efficiency by truncating large serialized tool-call arguments, skipping assistant thinking blocks, scaling and deduplicating serialized tool results, filtering aborted/error assistant messages from summaries, and heuristically tracking common bash file operations.
+
 ## [0.66.1] - 2026-04-05
 
 ### Changed
