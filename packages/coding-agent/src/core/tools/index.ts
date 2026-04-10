@@ -17,6 +17,7 @@ export {
 	type EditToolInput,
 	type EditToolOptions,
 } from "./edit.js";
+export { applyEditsToNormalizedContent, type Edit, EditApplyError, type SimilarLinesResult } from "./edit-diff.js";
 export { withFileMutationQueue } from "./file-mutation-queue.js";
 export {
 	createFindTool,
