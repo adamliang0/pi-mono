@@ -54,6 +54,35 @@ describe("edit tool prepareArguments", () => {
 		});
 	});
 
+	it("parses stringified edits arrays", () => {
+		const definition = createEditToolDefinition(process.cwd());
+		const prepared = definition.prepareArguments!({
+			path: "file.txt",
+			edits: JSON.stringify([{ oldText: "a", newText: "b" }]),
+		});
+		expect(prepared).toEqual({
+			path: "file.txt",
+			edits: [{ oldText: "a", newText: "b" }],
+		});
+	});
+
+	it("merges stringified edits arrays with legacy oldText/newText", () => {
+		const definition = createEditToolDefinition(process.cwd());
+		const prepared = definition.prepareArguments!({
+			path: "file.txt",
+			edits: JSON.stringify([{ oldText: "a", newText: "b" }]),
+			oldText: "c",
+			newText: "d",
+		});
+		expect(prepared).toEqual({
+			path: "file.txt",
+			edits: [
+				{ oldText: "a", newText: "b" },
+				{ oldText: "c", newText: "d" },
+			],
+		});
+	});
+
 	it("passes through valid input unchanged", () => {
 		const definition = createEditToolDefinition(process.cwd());
 		const input = {
@@ -85,6 +114,22 @@ describe("edit tool prepareArguments", () => {
 
 		const result = await definition.execute("tool-1", prepared, undefined, undefined, {} as ExtensionContext);
 		expect(result.content).toEqual([{ type: "text", text: "Successfully replaced 1 block(s) in legacy.txt." }]);
+		expect(await readFile(filePath, "utf8")).toBe("after\n");
+	});
+
+	it("stringified edits execute correctly", async () => {
+		const dir = await createTempDir();
+		const filePath = join(dir, "stringified.txt");
+		await writeFile(filePath, "before\n", "utf8");
+
+		const definition = createEditToolDefinition(dir);
+		const prepared = definition.prepareArguments!({
+			path: "stringified.txt",
+			edits: JSON.stringify([{ oldText: "before", newText: "after" }]),
+		});
+
+		const result = await definition.execute("tool-1", prepared, undefined, undefined, {} as ExtensionContext);
+		expect(result.content).toEqual([{ type: "text", text: "Successfully replaced 1 block(s) in stringified.txt." }]);
 		expect(await readFile(filePath, "utf8")).toBe("after\n");
 	});
 });
