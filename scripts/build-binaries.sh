@@ -32,36 +32,35 @@ PLATFORM=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --skip-deps)
-            SKIP_DEPS=true
-            shift
-            ;;
-        --platform)
-            PLATFORM="$2"
-            shift 2
-            ;;
-        *)
-            echo "Unknown option: $1"
-            exit 1
-            ;;
+    --skip-deps)
+        SKIP_DEPS=true
+        shift
+        ;;
+    --platform)
+        PLATFORM="$2"
+        shift 2
+        ;;
+    *)
+        echo "Unknown option: $1"
+        exit 1
+        ;;
     esac
 done
 
 # Validate platform if specified
 if [[ -n "$PLATFORM" ]]; then
     case "$PLATFORM" in
-        darwin-arm64|darwin-x64|linux-x64|linux-arm64|windows-x64)
-            ;;
-        *)
-            echo "Invalid platform: $PLATFORM"
-            echo "Valid platforms: darwin-arm64, darwin-x64, linux-x64, linux-arm64, windows-x64"
-            exit 1
-            ;;
+    darwin-arm64 | darwin-x64 | linux-x64 | linux-arm64 | windows-x64) ;;
+    *)
+        echo "Invalid platform: $PLATFORM"
+        echo "Valid platforms: darwin-arm64, darwin-x64, linux-x64, linux-arm64, windows-x64"
+        exit 1
+        ;;
     esac
 fi
 
 echo "==> Installing dependencies..."
-bun install --frozen-lockfile
+bun install
 
 if [[ "$SKIP_DEPS" == "false" ]]; then
     echo "==> Installing cross-platform native bindings..."
@@ -189,18 +188,18 @@ HOST_OS="$(uname -s)"
 HOST_ARCH="$(uname -m)"
 HOST_PLATFORM=""
 case "$HOST_OS" in
-    Darwin)
-        case "$HOST_ARCH" in
-            arm64) HOST_PLATFORM="darwin-arm64" ;;
-            x86_64) HOST_PLATFORM="darwin-x64" ;;
-        esac
-        ;;
-    Linux)
-        case "$HOST_ARCH" in
-            aarch64|arm64) HOST_PLATFORM="linux-arm64" ;;
-            x86_64|amd64) HOST_PLATFORM="linux-x64" ;;
-        esac
-        ;;
+Darwin)
+    case "$HOST_ARCH" in
+    arm64) HOST_PLATFORM="darwin-arm64" ;;
+    x86_64) HOST_PLATFORM="darwin-x64" ;;
+    esac
+    ;;
+Linux)
+    case "$HOST_ARCH" in
+    aarch64 | arm64) HOST_PLATFORM="linux-arm64" ;;
+    x86_64 | amd64) HOST_PLATFORM="linux-x64" ;;
+    esac
+    ;;
 esac
 
 if [[ -z "$HOST_PLATFORM" ]]; then
