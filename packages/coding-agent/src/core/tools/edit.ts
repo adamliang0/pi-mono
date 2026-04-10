@@ -44,7 +44,7 @@ const editSchema = Type.Object(
 		path: Type.String({ description: "Path to the file to edit (relative or absolute)" }),
 		edits: Type.Array(replaceEditSchema, {
 			description:
-				"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
+				"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead. Example: edits: [{ oldText: 'before', newText: 'after' }]. The tool also accepts a stringified JSON array and will parse it when possible.",
 		}),
 	},
 	{ additionalProperties: false },
@@ -54,6 +54,7 @@ export type EditToolInput = Static<typeof editSchema>;
 type LegacyEditToolInput = EditToolInput & {
 	oldText?: unknown;
 	newText?: unknown;
+	edits?: unknown;
 };
 
 export interface EditToolDetails {
@@ -87,17 +88,36 @@ export interface EditToolOptions {
 	operations?: EditOperations;
 }
 
+function parseStringifiedEdits(value: unknown): Edit[] | undefined {
+	if (typeof value !== "string") {
+		return undefined;
+	}
+
+	try {
+		const parsed = JSON.parse(value) as unknown;
+		return Array.isArray(parsed) ? (parsed as Edit[]) : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 function prepareEditArguments(input: unknown): EditToolInput {
 	if (!input || typeof input !== "object") {
 		return input as EditToolInput;
 	}
 
 	const args = input as LegacyEditToolInput;
+	const parsedStringEdits = parseStringifiedEdits(args.edits);
+
 	if (typeof args.oldText !== "string" || typeof args.newText !== "string") {
+		if (parsedStringEdits) {
+			return { ...args, edits: parsedStringEdits } as EditToolInput;
+		}
 		return input as EditToolInput;
 	}
 
-	const edits = Array.isArray(args.edits) ? [...args.edits] : [];
+	const existingEdits = Array.isArray(args.edits) ? args.edits : parsedStringEdits;
+	const edits = existingEdits ? [...existingEdits] : [];
 	edits.push({ oldText: args.oldText, newText: args.newText });
 	const { oldText: _oldText, newText: _newText, ...rest } = args;
 	return { ...rest, edits } as EditToolInput;
@@ -284,7 +304,7 @@ export function createEditToolDefinition(
 		name: "edit",
 		label: "edit",
 		description:
-			"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+			"Edit a single file using exact text replacement. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes. Example: { path: 'src/file.ts', edits: [{ oldText: 'before', newText: 'after' }] }. If edits is accidentally passed as a stringified JSON array, the tool will parse it when possible.",
 		promptSnippet:
 			"Make precise file edits with exact text replacement, including multiple disjoint edits in one call",
 		promptGuidelines: [
