@@ -341,10 +341,14 @@ async function executeToolCalls(
 	emit: AgentEventSink,
 ): Promise<ToolResultMessage[]> {
 	const toolCalls = assistantMessage.content.filter((c) => c.type === "toolCall");
+	// Precompute a Map for O(1) tool lookups instead of O(n) find per call
+	const toolMap = currentContext.tools
+		? new Map(currentContext.tools.map((t) => [t.name, t]))
+		: new Map<string, AgentTool<any>>();
 	if (config.toolExecution === "sequential") {
-		return executeToolCallsSequential(currentContext, assistantMessage, toolCalls, config, signal, emit);
+		return executeToolCallsSequential(currentContext, assistantMessage, toolCalls, config, signal, emit, toolMap);
 	}
-	return executeToolCallsParallel(currentContext, assistantMessage, toolCalls, config, signal, emit);
+	return executeToolCallsParallel(currentContext, assistantMessage, toolCalls, config, signal, emit, toolMap);
 }
 
 async function executeToolCallsSequential(
@@ -354,6 +358,7 @@ async function executeToolCallsSequential(
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,
 	emit: AgentEventSink,
+	toolMap: Map<string, AgentTool<any>>,
 ): Promise<ToolResultMessage[]> {
 	const results: ToolResultMessage[] = [];
 
@@ -365,7 +370,7 @@ async function executeToolCallsSequential(
 			args: toolCall.arguments,
 		});
 
-		const preparation = await prepareToolCall(currentContext, assistantMessage, toolCall, config, signal);
+		const preparation = await prepareToolCall(toolMap, currentContext, assistantMessage, toolCall, config, signal);
 		if (preparation.kind === "immediate") {
 			results.push(await emitToolCallOutcome(toolCall, preparation.result, preparation.isError, emit));
 		} else {
@@ -394,6 +399,7 @@ async function executeToolCallsParallel(
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,
 	emit: AgentEventSink,
+	toolMap: Map<string, AgentTool<any>>,
 ): Promise<ToolResultMessage[]> {
 	const results: ToolResultMessage[] = [];
 	const runnableCalls: PreparedToolCall[] = [];
@@ -406,7 +412,7 @@ async function executeToolCallsParallel(
 			args: toolCall.arguments,
 		});
 
-		const preparation = await prepareToolCall(currentContext, assistantMessage, toolCall, config, signal);
+		const preparation = await prepareToolCall(toolMap, currentContext, assistantMessage, toolCall, config, signal);
 		if (preparation.kind === "immediate") {
 			results.push(await emitToolCallOutcome(toolCall, preparation.result, preparation.isError, emit));
 		} else {
@@ -465,18 +471,19 @@ function prepareToolCallArguments(tool: AgentTool<any>, toolCall: AgentToolCall)
 	}
 	return {
 		...toolCall,
-		arguments: preparedArguments as Record<string, any>,
+		arguments: preparedArguments as Record<string, unknown>,
 	};
 }
 
 async function prepareToolCall(
+	toolMap: Map<string, AgentTool<any>>,
 	currentContext: AgentContext,
 	assistantMessage: AssistantMessage,
 	toolCall: AgentToolCall,
 	config: AgentLoopConfig,
 	signal: AbortSignal | undefined,
 ): Promise<PreparedToolCall | ImmediateToolCallOutcome> {
-	const tool = currentContext.tools?.find((t) => t.name === toolCall.name);
+	const tool = toolMap.get(toolCall.name);
 	if (!tool) {
 		return {
 			kind: "immediate",
@@ -526,7 +533,8 @@ async function executePreparedToolCall(
 	signal: AbortSignal | undefined,
 	emit: AgentEventSink,
 ): Promise<ExecutedToolCallOutcome> {
-	const updateEvents: Promise<void>[] = [];
+	// Serialize update events via a promise chain instead of an unbounded promise array
+	let pendingUpdate: Promise<void> = Promise.resolve();
 
 	try {
 		const result = await prepared.tool.execute(
@@ -534,23 +542,21 @@ async function executePreparedToolCall(
 			prepared.args as never,
 			signal,
 			(partialResult) => {
-				updateEvents.push(
-					Promise.resolve(
-						emit({
-							type: "tool_execution_update",
-							toolCallId: prepared.toolCall.id,
-							toolName: prepared.toolCall.name,
-							args: prepared.toolCall.arguments,
-							partialResult,
-						}),
-					),
+				pendingUpdate = pendingUpdate.then(() =>
+					emit({
+						type: "tool_execution_update",
+						toolCallId: prepared.toolCall.id,
+						toolName: prepared.toolCall.name,
+						args: prepared.toolCall.arguments,
+						partialResult,
+					}),
 				);
 			},
 		);
-		await Promise.all(updateEvents);
+		await pendingUpdate;
 		return { result, isError: false };
 	} catch (error) {
-		await Promise.all(updateEvents);
+		await pendingUpdate;
 		return {
 			result: createErrorToolResult(error instanceof Error ? error.message : String(error)),
 			isError: true,
@@ -594,7 +600,7 @@ async function finalizeExecutedToolCall(
 	return await emitToolCallOutcome(prepared.toolCall, result, isError, emit);
 }
 
-function createErrorToolResult(message: string): AgentToolResult<any> {
+function createErrorToolResult(message: string): AgentToolResult<unknown> {
 	return {
 		content: [{ type: "text", text: message }],
 		details: {},
@@ -603,7 +609,7 @@ function createErrorToolResult(message: string): AgentToolResult<any> {
 
 async function emitToolCallOutcome(
 	toolCall: AgentToolCall,
-	result: AgentToolResult<any>,
+	result: AgentToolResult<unknown>,
 	isError: boolean,
 	emit: AgentEventSink,
 ): Promise<ToolResultMessage> {
