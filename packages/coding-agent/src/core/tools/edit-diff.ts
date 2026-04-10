@@ -1,11 +1,23 @@
 /**
  * Shared diff computation utilities for the edit tool.
  * Used by both edit.ts (for execution) and tool-execution.ts (for preview rendering).
+ *
+ * Features:
+ * - Exact and fuzzy text matching with Unicode normalization
+ * - Uniform indentation detection and auto-fix
+ * - "Did you mean" suggestions on match failure
  */
 
 import * as Diff from "diff";
 import { constants } from "fs";
 import { access, readFile } from "fs/promises";
+import {
+	applyIndentationFix,
+	detectIndentationMismatch,
+	findSimilarLines,
+	formatDidYouMean,
+	type SimilarLinesResult,
+} from "./edit-utils.js";
 import { resolveToCwd } from "./path-utils.js";
 
 export function detectLineEnding(content: string): "\r\n" | "\n" {
@@ -57,17 +69,20 @@ export function normalizeForFuzzyMatch(text: string): string {
 export interface FuzzyMatchResult {
 	/** Whether a match was found */
 	found: boolean;
-	/** The index where the match starts (in the content that should be used for replacement) */
+	/** The index where the match starts */
 	index: number;
 	/** Length of the matched text */
 	matchLength: number;
-	/** Whether fuzzy matching was used (false = exact match) */
+	/** Whether fuzzy matching was used */
 	usedFuzzyMatch: boolean;
-	/**
-	 * The content to use for replacement operations.
-	 * When exact match: original content. When fuzzy match: normalized content.
-	 */
+	/** The content to use for replacement operations */
 	contentForReplacement: string;
+	/** Indentation fix that was applied, if any */
+	indentationFix?: {
+		offset: number;
+		fixedOldText: string;
+		fixedNewText: string;
+	};
 }
 
 export interface Edit {
@@ -80,6 +95,11 @@ interface MatchedEdit {
 	matchIndex: number;
 	matchLength: number;
 	newText: string;
+	indentationFix?: {
+		offset: number;
+		fixedOldText: string;
+		fixedNewText: string;
+	};
 }
 
 export interface AppliedEditsResult {
@@ -87,14 +107,29 @@ export interface AppliedEditsResult {
 	newContent: string;
 }
 
+export class EditApplyError extends Error {
+	constructor(
+		message: string,
+		public readonly path: string,
+		public readonly editIndex: number,
+		public readonly suggestions?: SimilarLinesResult,
+	) {
+		super(message);
+		this.name = "EditApplyError";
+	}
+}
+
+// Re-export types from edit-utils for extension access
+export type { SimilarLinesResult } from "./edit-utils.js";
+
 /**
- * Find oldText in content, trying exact match first, then fuzzy match.
- * When fuzzy matching is used, the returned contentForReplacement is the
- * fuzzy-normalized version of the content (trailing whitespace stripped,
- * Unicode quotes/dashes normalized to ASCII).
+ * Find oldText in content with multiple fallback strategies:
+ * 1. Exact match
+ * 2. Fuzzy match (Unicode normalization)
+ * 3. Indentation-corrected match
  */
-export function fuzzyFindText(content: string, oldText: string): FuzzyMatchResult {
-	// Try exact match first
+export function fuzzyFindText(content: string, oldText: string, newText: string): FuzzyMatchResult {
+	// Strategy 1: Exact match
 	const exactIndex = content.indexOf(oldText);
 	if (exactIndex !== -1) {
 		return {
@@ -106,34 +141,65 @@ export function fuzzyFindText(content: string, oldText: string): FuzzyMatchResul
 		};
 	}
 
-	// Try fuzzy match - work entirely in normalized space
+	// Strategy 2: Fuzzy match with Unicode normalization
 	const fuzzyContent = normalizeForFuzzyMatch(content);
 	const fuzzyOldText = normalizeForFuzzyMatch(oldText);
 	const fuzzyIndex = fuzzyContent.indexOf(fuzzyOldText);
 
-	if (fuzzyIndex === -1) {
+	if (fuzzyIndex !== -1) {
 		return {
-			found: false,
-			index: -1,
-			matchLength: 0,
-			usedFuzzyMatch: false,
-			contentForReplacement: content,
+			found: true,
+			index: fuzzyIndex,
+			matchLength: fuzzyOldText.length,
+			usedFuzzyMatch: true,
+			contentForReplacement: fuzzyContent,
 		};
 	}
 
-	// When fuzzy matching, we work in the normalized space for replacement.
-	// This means the output will have normalized whitespace/quotes/dashes,
-	// which is acceptable since we're fixing minor formatting differences anyway.
+	// Strategy 3: Try indentation mismatch fix (content vs oldText)
+	const indentFix = detectIndentationMismatch(content, oldText);
+	if (indentFix?.valid) {
+		const fixedOldText = applyIndentationFix(oldText, indentFix.offset);
+		const fixedIndex = content.indexOf(fixedOldText);
+		if (fixedIndex !== -1) {
+			const fixedNewText = applyIndentationFix(newText, indentFix.offset);
+			return {
+				found: true,
+				index: fixedIndex,
+				matchLength: fixedOldText.length,
+				usedFuzzyMatch: false,
+				contentForReplacement: content,
+				indentationFix: { offset: indentFix.offset, fixedOldText, fixedNewText },
+			};
+		}
+
+		// Also try fuzzy on fixed text
+		const fuzzyFixedOldText = normalizeForFuzzyMatch(fixedOldText);
+		const fuzzyFixedIndex = fuzzyContent.indexOf(fuzzyFixedOldText);
+		if (fuzzyFixedIndex !== -1) {
+			const fuzzyFixedContent = normalizeForFuzzyMatch(content);
+			const fixedNewText = applyIndentationFix(newText, indentFix.offset);
+			return {
+				found: true,
+				index: fuzzyFixedIndex,
+				matchLength: fuzzyFixedOldText.length,
+				usedFuzzyMatch: true,
+				contentForReplacement: fuzzyFixedContent,
+				indentationFix: { offset: indentFix.offset, fixedOldText, fixedNewText },
+			};
+		}
+	}
+
 	return {
-		found: true,
-		index: fuzzyIndex,
-		matchLength: fuzzyOldText.length,
-		usedFuzzyMatch: true,
-		contentForReplacement: fuzzyContent,
+		found: false,
+		index: -1,
+		matchLength: 0,
+		usedFuzzyMatch: false,
+		contentForReplacement: content,
 	};
 }
 
-/** Strip UTF-8 BOM if present, return both the BOM (if any) and the text without it */
+/** Strip UTF-8 BOM if present */
 export function stripBom(content: string): { bom: string; text: string } {
 	return content.startsWith("\uFEFF") ? { bom: "\uFEFF", text: content.slice(1) } : { bom: "", text: content };
 }
@@ -144,51 +210,58 @@ function countOccurrences(content: string, oldText: string): number {
 	return fuzzyContent.split(fuzzyOldText).length - 1;
 }
 
-function getNotFoundError(path: string, editIndex: number, totalEdits: number): Error {
-	if (totalEdits === 1) {
-		return new Error(
-			`Could not find the exact text in ${path}. The old text must match exactly including all whitespace and newlines.`,
-		);
+function formatNotFoundError(
+	path: string,
+	editIndex: number,
+	totalEdits: number,
+	suggestion: SimilarLinesResult | undefined,
+): Error {
+	const prefix = totalEdits === 1 ? "" : `edits[${editIndex}] `;
+
+	if (suggestion) {
+		const suggestionText = formatDidYouMean("", suggestion);
+		return new EditApplyError(`Could not find ${prefix}in ${path}.\n${suggestionText}`, path, editIndex, suggestion);
 	}
-	return new Error(
-		`Could not find edits[${editIndex}] in ${path}. The oldText must match exactly including all whitespace and newlines.`,
-	);
+
+	const baseMessage =
+		totalEdits === 1
+			? `Could not find the exact text in ${path}. The old text must match exactly including all whitespace and newlines.`
+			: `Could not find ${prefix}in ${path}. The oldText must match exactly including all whitespace and newlines.`;
+
+	return new EditApplyError(baseMessage, path, editIndex, undefined);
 }
 
-function getDuplicateError(path: string, editIndex: number, totalEdits: number, occurrences: number): Error {
-	if (totalEdits === 1) {
-		return new Error(
-			`Found ${occurrences} occurrences of the text in ${path}. The text must be unique. Please provide more context to make it unique.`,
-		);
-	}
-	return new Error(
-		`Found ${occurrences} occurrences of edits[${editIndex}] in ${path}. Each oldText must be unique. Please provide more context to make it unique.`,
-	);
+function formatDuplicateError(path: string, editIndex: number, totalEdits: number, occurrences: number): Error {
+	const prefix = totalEdits === 1 ? "" : `edits[${editIndex}] `;
+	const message =
+		totalEdits === 1
+			? `Found ${occurrences} occurrences of the text in ${path}. The text must be unique. Please provide more context to make it unique.`
+			: `Found ${occurrences} occurrences of ${prefix}in ${path}. Each oldText must be unique. Please provide more context to make it unique.`;
+
+	return new EditApplyError(message, path, editIndex);
 }
 
-function getEmptyOldTextError(path: string, editIndex: number, totalEdits: number): Error {
-	if (totalEdits === 1) {
-		return new Error(`oldText must not be empty in ${path}.`);
-	}
-	return new Error(`edits[${editIndex}].oldText must not be empty in ${path}.`);
+function formatEmptyOldTextError(path: string, editIndex: number, totalEdits: number): Error {
+	const prefix = totalEdits === 1 ? "oldText" : `edits[${editIndex}].oldText`;
+	return new EditApplyError(`${prefix} must not be empty in ${path}.`, path, editIndex);
 }
 
-function getNoChangeError(path: string, totalEdits: number): Error {
-	if (totalEdits === 1) {
-		return new Error(
-			`No changes made to ${path}. The replacement produced identical content. This might indicate an issue with special characters or the text not existing as expected.`,
-		);
-	}
-	return new Error(`No changes made to ${path}. The replacements produced identical content.`);
+function formatNoChangeError(path: string, totalEdits: number): Error {
+	const message =
+		totalEdits === 1
+			? `No changes made to ${path}. The replacement produced identical content. This might indicate an issue with special characters or the text not existing as expected.`
+			: `No changes made to ${path}. The replacements produced identical content.`;
+
+	return new EditApplyError(message, path, -1);
 }
 
 /**
  * Apply one or more exact-text replacements to LF-normalized content.
  *
- * All edits are matched against the same original content. Replacements are
- * then applied in reverse order so offsets remain stable. If any edit needs
- * fuzzy matching, the operation runs in fuzzy-normalized content space to
- * preserve current single-edit behavior.
+ * Strategies tried:
+ * 1. Exact match
+ * 2. Fuzzy match (Unicode normalization)
+ * 3. Uniform indentation-corrected match
  */
 export function applyEditsToNormalizedContent(
 	normalizedContent: string,
@@ -200,49 +273,65 @@ export function applyEditsToNormalizedContent(
 		newText: normalizeToLF(edit.newText),
 	}));
 
+	// Validate no empty oldText
 	for (let i = 0; i < normalizedEdits.length; i++) {
 		if (normalizedEdits[i].oldText.length === 0) {
-			throw getEmptyOldTextError(path, i, normalizedEdits.length);
+			throw formatEmptyOldTextError(path, i, normalizedEdits.length);
 		}
 	}
 
-	const initialMatches = normalizedEdits.map((edit) => fuzzyFindText(normalizedContent, edit.oldText));
-	const baseContent = initialMatches.some((match) => match.usedFuzzyMatch)
-		? normalizeForFuzzyMatch(normalizedContent)
-		: normalizedContent;
+	// First pass: find matches with fallback strategies
+	const initialMatches = normalizedEdits.map((edit) => fuzzyFindText(normalizedContent, edit.oldText, edit.newText));
 
+	// Determine if we need fuzzy content space
+	const useFuzzyContent = initialMatches.some((match) => match.usedFuzzyMatch);
+	const baseContent = useFuzzyContent ? normalizeForFuzzyMatch(normalizedContent) : normalizedContent;
+
+	// Second pass: validate all matches and collect results
 	const matchedEdits: MatchedEdit[] = [];
 	for (let i = 0; i < normalizedEdits.length; i++) {
 		const edit = normalizedEdits[i];
-		const matchResult = fuzzyFindText(baseContent, edit.oldText);
+		const matchResult = fuzzyFindText(baseContent, edit.oldText, edit.newText);
+
 		if (!matchResult.found) {
-			throw getNotFoundError(path, i, normalizedEdits.length);
+			// Try to find a suggestion
+			const suggestion = findSimilarLines(
+				normalizedContent,
+				edit.oldText,
+				0.6, // 60% similarity threshold for suggestions
+			);
+			throw formatNotFoundError(path, i, normalizedEdits.length, suggestion ?? undefined);
 		}
 
 		const occurrences = countOccurrences(baseContent, edit.oldText);
 		if (occurrences > 1) {
-			throw getDuplicateError(path, i, normalizedEdits.length, occurrences);
+			throw formatDuplicateError(path, i, normalizedEdits.length, occurrences);
 		}
 
 		matchedEdits.push({
 			editIndex: i,
 			matchIndex: matchResult.index,
 			matchLength: matchResult.matchLength,
-			newText: edit.newText,
+			newText: matchResult.indentationFix?.fixedNewText ?? edit.newText,
+			indentationFix: matchResult.indentationFix,
 		});
 	}
 
+	// Check for overlapping edits
 	matchedEdits.sort((a, b) => a.matchIndex - b.matchIndex);
 	for (let i = 1; i < matchedEdits.length; i++) {
 		const previous = matchedEdits[i - 1];
 		const current = matchedEdits[i];
 		if (previous.matchIndex + previous.matchLength > current.matchIndex) {
-			throw new Error(
+			throw new EditApplyError(
 				`edits[${previous.editIndex}] and edits[${current.editIndex}] overlap in ${path}. Merge them into one edit or target disjoint regions.`,
+				path,
+				previous.editIndex,
 			);
 		}
 	}
 
+	// Apply edits in reverse order to preserve indices
 	let newContent = baseContent;
 	for (let i = matchedEdits.length - 1; i >= 0; i--) {
 		const edit = matchedEdits[i];
@@ -253,7 +342,7 @@ export function applyEditsToNormalizedContent(
 	}
 
 	if (baseContent === newContent) {
-		throw getNoChangeError(path, normalizedEdits.length);
+		throw formatNoChangeError(path, normalizedEdits.length);
 	}
 
 	return { baseContent, newContent };
@@ -261,7 +350,6 @@ export function applyEditsToNormalizedContent(
 
 /**
  * Generate a unified diff string with line numbers and context.
- * Returns both the diff string and the first changed line number (in the new file).
  */
 export function generateDiffString(
 	oldContent: string,
@@ -289,19 +377,16 @@ export function generateDiffString(
 		}
 
 		if (part.added || part.removed) {
-			// Capture the first changed line (in the new file)
 			if (firstChangedLine === undefined) {
 				firstChangedLine = newLineNum;
 			}
 
-			// Show the change
 			for (const line of raw) {
 				if (part.added) {
 					const lineNum = String(newLineNum).padStart(lineNumWidth, " ");
 					output.push(`+${lineNum} ${line}`);
 					newLineNum++;
 				} else {
-					// removed
 					const lineNum = String(oldLineNum).padStart(lineNumWidth, " ");
 					output.push(`-${lineNum} ${line}`);
 					oldLineNum++;
@@ -309,7 +394,6 @@ export function generateDiffString(
 			}
 			lastWasChange = true;
 		} else {
-			// Context lines - only show a few before/after changes
 			const nextPartIsChange = i < parts.length - 1 && (parts[i + 1].added || parts[i + 1].removed);
 			const hasLeadingChange = lastWasChange;
 			const hasTrailingChange = nextPartIsChange;
@@ -376,7 +460,6 @@ export function generateDiffString(
 					newLineNum++;
 				}
 			} else {
-				// Skip these context lines entirely
 				oldLineNum += raw.length;
 				newLineNum += raw.length;
 			}
@@ -399,7 +482,6 @@ export interface EditDiffError {
 
 /**
  * Compute the diff for one or more edit operations without applying them.
- * Used for preview rendering in the TUI before the tool executes.
  */
 export async function computeEditsDiff(
 	path: string,
@@ -409,31 +491,28 @@ export async function computeEditsDiff(
 	const absolutePath = resolveToCwd(path, cwd);
 
 	try {
-		// Check if file exists and is readable
 		try {
 			await access(absolutePath, constants.R_OK);
 		} catch {
 			return { error: `File not found: ${path}` };
 		}
 
-		// Read the file
 		const rawContent = await readFile(absolutePath, "utf-8");
-
-		// Strip BOM before matching (LLM won't include invisible BOM in oldText)
 		const { text: content } = stripBom(rawContent);
 		const normalizedContent = normalizeToLF(content);
 		const { baseContent, newContent } = applyEditsToNormalizedContent(normalizedContent, edits, path);
 
-		// Generate the diff
 		return generateDiffString(baseContent, newContent);
 	} catch (err) {
+		if (err instanceof EditApplyError) {
+			return { error: err.message };
+		}
 		return { error: err instanceof Error ? err.message : String(err) };
 	}
 }
 
 /**
  * Compute the diff for a single edit operation without applying it.
- * Kept as a convenience wrapper for single-edit callers.
  */
 export async function computeEditDiff(
 	path: string,
