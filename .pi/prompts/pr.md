@@ -25,6 +25,8 @@ Output format per PR:
 PR: <url>
 Changelog:
 - ...
+Version bump needed:
+- **patch** / **minor** / **major** (with rationale based on API changes)
 Good:
 - ...
 Bad:
@@ -39,3 +41,10 @@ Tests:
 - ...
 
 If no issues are found, say so under Bad and Ugly.
+
+Version bump guidance for review:
+- **patch**: Bug fixes, performance improvements, or internal refactoring with no API changes.
+- **minor**: Any API addition, deprecation, or behavioral change—even if it seems small.
+- **major**: Ask the user before approving. Major bumps require significant migration work.
+
+Always suggest a bump level in your review. If the PR touches multiple packages, note whether they should all be bumped together (they use lockstep versioning).
