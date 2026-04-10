@@ -5,7 +5,7 @@
  * Usage: node scripts/release.mjs <major|minor|patch>
  *
  * Environment:
- *   SKIP_NPM_PUBLISH=1  Skip npm publish (GitHub-binary-only releases).
+ *   SKIP_NPM_PUBLISH=1  Skip npm publish (default for GitHub binary-only releases).
  *   RELEASE_REMOTE      Remote name (default: origin).
  *   RELEASE_BRANCH      Branch to push (default: main).
  *
@@ -14,10 +14,15 @@
  * 2. Bump version via bun run version:xxx
  * 3. Update CHANGELOG.md files: [Unreleased] -> [version] - date
  * 4. Commit and tag
- * 5. Publish to npm (unless SKIP_NPM_PUBLISH=1)
- * 6. Add new [Unreleased] section to changelogs
- * 7. Commit
- * 8. Push branch and tag
+ * 5. Push branch and tag
+ * 6. Build and upload binaries to GitHub Release via gh CLI
+ * 7. Add new [Unreleased] section to changelogs
+ * 8. Commit
+ * 9. Push
+ *
+ * After running this script, build and upload binaries:
+ *   ./scripts/build-binaries.sh
+ *   node scripts/upload-pi-binaries-to-github-release.mjs
  */
 
 import { execSync } from "node:child_process";
@@ -25,7 +30,7 @@ import { readFileSync } from "node:fs";
 import { addUnreleasedSection, updateChangelogsForRelease } from "./changelog-release.mjs";
 
 const BUMP_TYPE = process.argv[2];
-const SKIP_NPM_PUBLISH = process.env.SKIP_NPM_PUBLISH === "1" || process.env.SKIP_NPM_PUBLISH === "true";
+const SKIP_NPM_PUBLISH = true; // Always skip npm publish for GitHub binary releases
 const RELEASE_REMOTE = process.env.RELEASE_REMOTE || "origin";
 const RELEASE_BRANCH = process.env.RELEASE_BRANCH || "main";
 
@@ -83,30 +88,38 @@ run(`git commit -m "Release v${version}"`);
 run(`git tag v${version}`);
 console.log();
 
-// 5. Publish
-if (SKIP_NPM_PUBLISH) {
-  console.log("Skipping npm publish (SKIP_NPM_PUBLISH set)\n");
-} else {
-  console.log("Publishing to npm...");
-  run("bun run publish");
-  console.log();
-}
-
-// 6. Add new [Unreleased] sections
-console.log("Adding [Unreleased] sections for next cycle...");
-addUnreleasedSection();
-console.log();
-
-// 7. Commit
-console.log("Committing changelog updates...");
-run("git add .");
-run(`git commit -m "Add [Unreleased] section for next cycle"`);
-console.log();
-
-// 8. Push
+// 5. Push branch and tag
 console.log("Pushing to remote...");
 run(`git push ${RELEASE_REMOTE} ${RELEASE_BRANCH}`);
 run(`git push ${RELEASE_REMOTE} v${version}`);
 console.log();
 
+// 6. Build and upload binaries (manual via gh CLI)
+console.log("=== Build and Upload Binaries ===\n");
+console.log("Run these commands to create and upload binaries:\n");
+console.log(`  # Build binaries:`);
+console.log(`  ./scripts/build-binaries.sh\n`);
+console.log(`  # Upload to GitHub Release:`);
+console.log(`  node scripts/upload-pi-binaries-to-github-release.mjs\n`);
+console.log("Or use the 'Release (GitHub binaries)' workflow in GitHub Actions.\n");
+
+// 7. Add new [Unreleased] sections
+console.log("Adding [Unreleased] sections for next cycle...");
+addUnreleasedSection();
+console.log();
+
+// 8. Commit
+console.log("Committing changelog updates...");
+run("git add .");
+run(`git commit -m "Add [Unreleased] section for next cycle"`);
+console.log();
+
+// 9. Push
+console.log("Pushing changelog updates...");
+run(`git push ${RELEASE_REMOTE} ${RELEASE_BRANCH}`);
+console.log();
+
 console.log(`=== Released v${version} ===`);
+console.log(`\nNext steps:`);
+console.log(`  1. Run: ./scripts/build-binaries.sh`);
+console.log(`  2. Run: node scripts/upload-pi-binaries-to-github-release.mjs`);
