@@ -28,6 +28,7 @@ import { isContextOverflow, modelsAreEqual, resetApiProviders, supportsXhigh } f
 import { getDocsPath } from "../config.js";
 import { theme } from "../modes/interactive/theme/theme.js";
 import { stripFrontmatter } from "../utils/frontmatter.js";
+import { isLocalPath } from "../utils/paths.js";
 import { sleep } from "../utils/sleep.js";
 import { type BashResult, executeBashWithOperations } from "./bash-executor.js";
 import {
@@ -80,6 +81,93 @@ import { buildSystemPrompt } from "./system-prompt.js";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.js";
 import { createAllToolDefinitions } from "./tools/index.js";
 import { createToolDefinitionFromAgentTool, wrapToolDefinition } from "./tools/tool-definition-wrapper.js";
+
+// ============================================================================
+// LSP Extension Integration
+// ============================================================================
+
+/** Timeout for waiting on LSP diagnostics after file edit (ms) */
+const LSP_DIAGNOSTICS_TIMEOUT_MS = 3000;
+
+/** File extensions supported by TypeScript/JavaScript language servers */
+const LSP_SUPPORTED_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
+
+/**
+ * Check if a file path has an LSP-supported extension.
+ */
+function isLspSupportedFile(filePath: string): boolean {
+	const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+	return LSP_SUPPORTED_EXTENSIONS.has(ext);
+}
+
+/**
+ * Format LSP diagnostics for display in tool results.
+ */
+function formatLspDiagnostics(
+	diagnostics: Array<{
+		message: string;
+		severity?: number;
+		range?: { start: { line: number; character: number }; end: { line: number; character: number } };
+	}>,
+): string {
+	if (diagnostics.length === 0) {
+		return "";
+	}
+
+	const lines: string[] = [];
+	lines.push("\n LSP Diagnostics:");
+
+	for (const d of diagnostics) {
+		const line = d.range?.start.line ?? 0;
+		const col = d.range?.start.character ?? 0;
+		const severity = d.severity;
+		const sevText = severity === 1 ? "error" : severity === 2 ? "warning" : severity === 3 ? "info" : "hint";
+		lines.push(`  [${sevText}] line ${line + 1}, col ${col + 1}: ${d.message}`);
+	}
+
+	return lines.join("\n");
+}
+
+/**
+ * Run LSP diagnostics on a file after edit.
+ * Returns formatted diagnostic string if successful, empty string on failure.
+ */
+async function runLspDiagnostics(
+	_filePath: string,
+	absoluteFilePath: string,
+	cwd: string,
+	signal?: AbortSignal,
+): Promise<string> {
+	try {
+		// Dynamically import pi-lsp extension
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const lspModule = await (Function("return import('@pi-mono/lsp/client')")() as Promise<any>);
+		const getOrCreateClient = lspModule?.getOrCreateClient;
+		const waitForDiagnostics = lspModule?.waitForDiagnostics;
+		const fileToUri = lspModule?.fileToUri;
+
+		if (!getOrCreateClient || !waitForDiagnostics || !fileToUri) {
+			return "";
+		}
+
+		const uri = fileToUri(absoluteFilePath);
+		const client = await getOrCreateClient({
+			cwd,
+			filePath: absoluteFilePath,
+			signal,
+		});
+
+		if (!client) {
+			return "";
+		}
+
+		const diagnostics = await waitForDiagnostics(client, uri, LSP_DIAGNOSTICS_TIMEOUT_MS, signal);
+		return formatLspDiagnostics(diagnostics);
+	} catch {
+		// LSP diagnostics failed or pi-lsp not installed - this is expected
+		return "";
+	}
+}
 
 // ============================================================================
 // Skill Block Parsing
@@ -286,6 +374,10 @@ export class AgentSession {
 	private _extensionErrorListener?: ExtensionErrorListener;
 	private _extensionErrorUnsubscriber?: () => void;
 
+	// LSP extension integration (detected lazily on first edit tool use)
+	private _lspExtensionChecked = false;
+	private _lspExtensionAvailable = false;
+
 	// Model registry for API key resolution
 	private _modelRegistry: ModelRegistry;
 
@@ -386,7 +478,7 @@ export class AgentSession {
 			}
 		};
 
-		this.agent.afterToolCall = async ({ toolCall, args, result, isError }) => {
+		this.agent.afterToolCall = async ({ toolCall, args, result, isError }, signal) => {
 			const runner = this._extensionRunner;
 			if (!runner?.hasHandlers("tool_result")) {
 				return undefined;
@@ -406,12 +498,63 @@ export class AgentSession {
 				return undefined;
 			}
 
+			// Run LSP diagnostics for edit tool if pi-lsp extension is available
+			const lspContent = await this._maybeRunLspDiagnostics(toolCall.name, args, signal);
+			if (lspContent) {
+				return {
+					content: [...(hookResult.content ?? []), { type: "text", text: lspContent }],
+					details: hookResult.details,
+				};
+			}
+
 			return {
 				content: hookResult.content,
 				details: hookResult.details,
 				isError: hookResult.isError ?? isError,
 			};
 		};
+	}
+
+	/**
+	 * Run LSP diagnostics for edit tool if pi-lsp extension is installed.
+	 * Returns diagnostic text if successful, empty string otherwise.
+	 */
+	private async _maybeRunLspDiagnostics(toolName: string, args: unknown, signal?: AbortSignal): Promise<string> {
+		// Only run diagnostics for edit tool on non-error results
+		if (toolName !== "edit") {
+			return "";
+		}
+
+		// Lazily check if pi-lsp extension is installed
+		if (!this._lspExtensionChecked) {
+			this._lspExtensionChecked = true;
+			const extensions = this._resourceLoader.getExtensions();
+			this._lspExtensionAvailable = extensions.extensions.some((ext) => {
+				const path = ext.path.toLowerCase();
+				return path.includes("pi-mono-lsp") || path.includes("@pi-mono/lsp") || path.includes("pi-lsp");
+			});
+		}
+
+		if (!this._lspExtensionAvailable) {
+			return "";
+		}
+
+		// Extract file path from edit args
+		const editArgs = args as { path?: string; file_path?: string };
+		const rawPath = editArgs?.path ?? editArgs?.file_path;
+		if (!rawPath) {
+			return "";
+		}
+
+		// Only run for TypeScript/JavaScript files
+		if (!isLspSupportedFile(rawPath)) {
+			return "";
+		}
+
+		// Resolve to absolute path
+		const absolutePath = isLocalPath(rawPath) ? resolve(this._cwd, rawPath) : rawPath;
+
+		return runLspDiagnostics(rawPath, absolutePath, this._cwd, signal);
 	}
 
 	// =========================================================================
