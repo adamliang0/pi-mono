@@ -60,9 +60,11 @@ function extractUserMessageText(content: string | Array<{ type: string; text?: s
 /**
  * Owns the current AgentSession plus its cwd-bound services.
  *
- * Session replacement methods tear down the current runtime first, then create
- * and apply the next runtime. If creation fails, the error is propagated to the
- * caller. The caller is responsible for user-facing error handling.
+ * Session replacement methods first prepare the next runtime and only tear down
+ * the current runtime once the replacement has been created successfully. If
+ * commit fails after creation, the prepared replacement session is disposed and
+ * the error is propagated to the caller. The caller is responsible for
+ * user-facing error handling.
  */
 export class AgentSessionRuntime {
 	constructor(
@@ -128,6 +130,20 @@ export class AgentSessionRuntime {
 		this.session.dispose();
 	}
 
+	private async transitionTo(nextRuntime: Promise<CreateAgentSessionRuntimeResult>): Promise<void> {
+		const result = await nextRuntime;
+		let applied = false;
+		try {
+			await this.teardownCurrent();
+			this.apply(result);
+			applied = true;
+		} finally {
+			if (!applied) {
+				result.session.dispose();
+			}
+		}
+	}
+
 	private apply(result: CreateAgentSessionRuntimeResult): void {
 		if (process.cwd() !== result.services.cwd) {
 			process.chdir(result.services.cwd);
@@ -147,9 +163,8 @@ export class AgentSessionRuntime {
 		const previousSessionFile = this.session.sessionFile;
 		const sessionManager = SessionManager.open(sessionPath, undefined, cwdOverride);
 		assertSessionCwdExists(sessionManager, this.cwd);
-		await this.teardownCurrent();
-		this.apply(
-			await this.createRuntime({
+		await this.transitionTo(
+			this.createRuntime({
 				cwd: sessionManager.getCwd(),
 				agentDir: this.services.agentDir,
 				sessionManager,
@@ -175,9 +190,8 @@ export class AgentSessionRuntime {
 			sessionManager.newSession({ parentSession: options.parentSession });
 		}
 
-		await this.teardownCurrent();
-		this.apply(
-			await this.createRuntime({
+		await this.transitionTo(
+			this.createRuntime({
 				cwd: this.cwd,
 				agentDir: this.services.agentDir,
 				sessionManager,
@@ -213,9 +227,8 @@ export class AgentSessionRuntime {
 			if (!selectedEntry.parentId) {
 				const sessionManager = SessionManager.create(this.cwd, sessionDir);
 				sessionManager.newSession({ parentSession: currentSessionFile });
-				await this.teardownCurrent();
-				this.apply(
-					await this.createRuntime({
+				await this.transitionTo(
+					this.createRuntime({
 						cwd: this.cwd,
 						agentDir: this.services.agentDir,
 						sessionManager,
@@ -231,9 +244,8 @@ export class AgentSessionRuntime {
 				throw new Error("Failed to create forked session");
 			}
 			const sessionManager = SessionManager.open(forkedSessionPath, sessionDir);
-			await this.teardownCurrent();
-			this.apply(
-				await this.createRuntime({
+			await this.transitionTo(
+				this.createRuntime({
 					cwd: sessionManager.getCwd(),
 					agentDir: this.services.agentDir,
 					sessionManager,
@@ -249,9 +261,8 @@ export class AgentSessionRuntime {
 		} else {
 			sessionManager.createBranchedSession(selectedEntry.parentId);
 		}
-		await this.teardownCurrent();
-		this.apply(
-			await this.createRuntime({
+		await this.transitionTo(
+			this.createRuntime({
 				cwd: this.cwd,
 				agentDir: this.services.agentDir,
 				sessionManager,
@@ -292,9 +303,8 @@ export class AgentSessionRuntime {
 
 		const sessionManager = SessionManager.open(destinationPath, sessionDir, cwdOverride);
 		assertSessionCwdExists(sessionManager, this.cwd);
-		await this.teardownCurrent();
-		this.apply(
-			await this.createRuntime({
+		await this.transitionTo(
+			this.createRuntime({
 				cwd: sessionManager.getCwd(),
 				agentDir: this.services.agentDir,
 				sessionManager,
@@ -305,8 +315,7 @@ export class AgentSessionRuntime {
 	}
 
 	async dispose(): Promise<void> {
-		await emitSessionShutdownEvent(this.session.extensionRunner);
-		this.session.dispose();
+		await this.teardownCurrent();
 	}
 }
 

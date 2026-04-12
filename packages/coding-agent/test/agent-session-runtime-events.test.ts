@@ -29,7 +29,16 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 		}
 	});
 
-	async function createRuntimeHost(extensionFactory: ExtensionFactory) {
+	async function createRuntimeHost(
+		extensionFactory: ExtensionFactory,
+		options?: {
+			beforeCreateRuntime?: (args: {
+				cwd: string;
+				sessionManager: SessionManager;
+				sessionStartEvent?: SessionStartEvent;
+			}) => Promise<void> | void;
+		},
+	) {
 		const tempDir = join(tmpdir(), `pi-runtime-events-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		mkdirSync(tempDir, { recursive: true });
 
@@ -51,6 +60,7 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 			},
 		};
 		const createRuntime: CreateAgentSessionRuntimeFactory = async ({ cwd, sessionManager, sessionStartEvent }) => {
+			await options?.beforeCreateRuntime?.({ cwd, sessionManager, sessionStartEvent });
 			const services = await createAgentSessionServices({
 				...runtimeOptions,
 				cwd,
@@ -146,6 +156,28 @@ describe("AgentSessionRuntime session lifecycle events", () => {
 		expect(result.cancelled).toBe(true);
 		expect(runtimeHost.session.sessionFile).toBe(originalSessionFile);
 		expect(events).toEqual([{ type: "session_before_switch", reason: "new", targetSessionFile: undefined }]);
+	});
+
+	it("keeps the current runtime active when replacement runtime creation fails", async () => {
+		const { runtimeHost } = await createRuntimeHost(() => {}, {
+			beforeCreateRuntime: ({ sessionStartEvent }) => {
+				if (sessionStartEvent?.reason === "new") {
+					throw new Error("new session creation failed");
+				}
+			},
+		});
+
+		await runtimeHost.session.prompt("hello");
+		const originalSession = runtimeHost.session;
+		const originalSessionFile = runtimeHost.session.sessionFile;
+
+		await expect(runtimeHost.newSession()).rejects.toThrow("new session creation failed");
+		expect(runtimeHost.session).toBe(originalSession);
+		expect(runtimeHost.session.sessionFile).toBe(originalSessionFile);
+
+		await runtimeHost.session.prompt("still here");
+		expect(runtimeHost.session).toBe(originalSession);
+		expect(runtimeHost.session.sessionFile).toBe(originalSessionFile);
 	});
 
 	it("emits session_before_fork and session_start and honors cancellation", async () => {
