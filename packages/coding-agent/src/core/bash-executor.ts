@@ -6,12 +6,9 @@
  * - Direct calls from modes that need bash execution
  */
 
-import { randomBytes } from "node:crypto";
 import { createWriteStream, type WriteStream } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import stripAnsi from "strip-ansi";
-import { sanitizeBinaryOutput } from "../utils/shell.js";
+import { getTempFilePath, sanitizeBinaryOutput } from "../utils/shell.js";
 import { type BashOperations, createLocalBashOperations } from "./tools/bash.js";
 import { DEFAULT_MAX_BYTES, truncateTail } from "./tools/truncate.js";
 
@@ -82,8 +79,7 @@ export async function executeBashWithOperations(
 		if (tempFilePath) {
 			return;
 		}
-		const id = randomBytes(8).toString("hex");
-		tempFilePath = join(tmpdir(), `pi-bash-${id}.log`);
+		tempFilePath = getTempFilePath();
 		tempFileStream = createWriteStream(tempFilePath);
 		for (const chunk of outputChunks) {
 			tempFileStream.write(chunk);

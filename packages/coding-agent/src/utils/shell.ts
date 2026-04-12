@@ -1,10 +1,31 @@
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { delimiter } from "node:path";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
 import { spawn, spawnSync } from "child_process";
 import { getBinDir, getSettingsPath } from "../config.js";
 import { SettingsManager } from "../core/settings-manager.js";
 
 let cachedShellConfig: { shell: string; args: string[] } | null = null;
+let cachedShellConfigKey: string | null = null;
+
+function getShellConfigCacheKey(customShellPath: string | undefined): string {
+	const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+	return JSON.stringify({
+		customShellPath: customShellPath ?? null,
+		customShellPathExists: customShellPath ? existsSync(customShellPath) : null,
+		platform: process.platform,
+		path: process.env[pathKey] ?? "",
+		programFiles: process.env.ProgramFiles ?? "",
+		programFilesX86: process.env["ProgramFiles(x86)"] ?? "",
+	});
+}
+
+function setCachedShellConfig(cacheKey: string, shell: string, args: string[]): { shell: string; args: string[] } {
+	cachedShellConfig = { shell, args };
+	cachedShellConfigKey = cacheKey;
+	return cachedShellConfig;
+}
 
 /**
  * Find bash executable on PATH (cross-platform)
@@ -49,18 +70,17 @@ function findBashOnPath(): string | null {
  * 3. On Unix: /bin/bash, then bash on PATH, then fallback to sh
  */
 export function getShellConfig(): { shell: string; args: string[] } {
-	if (cachedShellConfig) {
-		return cachedShellConfig;
-	}
-
 	const settings = SettingsManager.create();
 	const customShellPath = settings.getShellPath();
+	const cacheKey = getShellConfigCacheKey(customShellPath);
+	if (cachedShellConfig && cachedShellConfigKey === cacheKey) {
+		return cachedShellConfig;
+	}
 
 	// 1. Check user-specified shell path
 	if (customShellPath) {
 		if (existsSync(customShellPath)) {
-			cachedShellConfig = { shell: customShellPath, args: ["-c"] };
-			return cachedShellConfig;
+			return setCachedShellConfig(cacheKey, customShellPath, ["-c"]);
 		}
 		throw new Error(
 			`Custom shell path not found: ${customShellPath}\nPlease update shellPath in ${getSettingsPath()}`,
@@ -81,16 +101,14 @@ export function getShellConfig(): { shell: string; args: string[] } {
 
 		for (const path of paths) {
 			if (existsSync(path)) {
-				cachedShellConfig = { shell: path, args: ["-c"] };
-				return cachedShellConfig;
+				return setCachedShellConfig(cacheKey, path, ["-c"]);
 			}
 		}
 
 		// 3. Fallback: search bash.exe on PATH (Cygwin, MSYS2, WSL, etc.)
 		const bashOnPath = findBashOnPath();
 		if (bashOnPath) {
-			cachedShellConfig = { shell: bashOnPath, args: ["-c"] };
-			return cachedShellConfig;
+			return setCachedShellConfig(cacheKey, bashOnPath, ["-c"]);
 		}
 
 		throw new Error(
@@ -104,18 +122,15 @@ export function getShellConfig(): { shell: string; args: string[] } {
 
 	// Unix: try /bin/bash, then bash on PATH, then fallback to sh
 	if (existsSync("/bin/bash")) {
-		cachedShellConfig = { shell: "/bin/bash", args: ["-c"] };
-		return cachedShellConfig;
+		return setCachedShellConfig(cacheKey, "/bin/bash", ["-c"]);
 	}
 
 	const bashOnPath = findBashOnPath();
 	if (bashOnPath) {
-		cachedShellConfig = { shell: bashOnPath, args: ["-c"] };
-		return cachedShellConfig;
+		return setCachedShellConfig(cacheKey, bashOnPath, ["-c"]);
 	}
 
-	cachedShellConfig = { shell: "sh", args: ["-c"] };
-	return cachedShellConfig;
+	return setCachedShellConfig(cacheKey, "sh", ["-c"]);
 }
 
 export function getShellEnv(): NodeJS.ProcessEnv {
@@ -220,4 +235,13 @@ export function killProcessTree(pid: number): void {
 			}
 		}
 	}
+}
+
+/**
+ * Generate a unique temp file path for bash output capture.
+ * Used by both bash.ts (bash tool) and bash-executor.ts (executeBash).
+ */
+export function getTempFilePath(): string {
+	const id = randomBytes(8).toString("hex");
+	return join(tmpdir(), `pi-bash-${id}.log`);
 }
