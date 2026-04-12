@@ -15,3 +15,8 @@ For most users, [Git for Windows](https://git-scm.com/download/win) is sufficien
   "shellPath": "C:\\cygwin64\\bin\\bash.exe"
 }
 ```
+
+## Windows-Specific Shell Implementation
+
+Windows-specific implementation and testing for bash/shell features is intentionally deferred pending upstream clarification. Contributions welcome.
+

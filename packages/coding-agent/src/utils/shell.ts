@@ -1,11 +1,30 @@
+import { randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { delimiter } from "node:path";
+import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
 import { spawn, spawnSync } from "child_process";
-import { getBinDir } from "../config.js";
+import { getBinDir, getSettingsPath } from "../config.js";
+import { SettingsManager } from "../core/settings-manager.js";
 
-export interface ShellConfig {
-	shell: string;
-	args: string[];
+let cachedShellConfig: { shell: string; args: string[] } | null = null;
+let cachedShellConfigKey: string | null = null;
+
+function getShellConfigCacheKey(customShellPath: string | undefined): string {
+	const pathKey = Object.keys(process.env).find((key) => key.toLowerCase() === "path") ?? "PATH";
+	return JSON.stringify({
+		customShellPath: customShellPath ?? null,
+		customShellPathExists: customShellPath ? existsSync(customShellPath) : null,
+		platform: process.platform,
+		path: process.env[pathKey] ?? "",
+		programFiles: process.env.ProgramFiles ?? "",
+		programFilesX86: process.env["ProgramFiles(x86)"] ?? "",
+	});
+}
+
+function setCachedShellConfig(cacheKey: string, shell: string, args: string[]): { shell: string; args: string[] } {
+	cachedShellConfig = { shell, args };
+	cachedShellConfigKey = cacheKey;
+	return cachedShellConfig;
 }
 
 /**
@@ -44,19 +63,28 @@ function findBashOnPath(): string | null {
 }
 
 /**
- * Resolve shell configuration based on platform and an optional explicit shell path.
+ * Get shell configuration based on platform.
  * Resolution order:
- * 1. User-specified shellPath
+ * 1. User-specified shellPath in settings.json
  * 2. On Windows: Git Bash in known locations, then bash on PATH
  * 3. On Unix: /bin/bash, then bash on PATH, then fallback to sh
  */
-export function getShellConfig(customShellPath?: string): ShellConfig {
+export function getShellConfig(): { shell: string; args: string[] } {
+	const settings = SettingsManager.create();
+	const customShellPath = settings.getShellPath();
+	const cacheKey = getShellConfigCacheKey(customShellPath);
+	if (cachedShellConfig && cachedShellConfigKey === cacheKey) {
+		return cachedShellConfig;
+	}
+
 	// 1. Check user-specified shell path
 	if (customShellPath) {
 		if (existsSync(customShellPath)) {
-			return { shell: customShellPath, args: ["-c"] };
+			return setCachedShellConfig(cacheKey, customShellPath, ["-c"]);
 		}
-		throw new Error(`Custom shell path not found: ${customShellPath}`);
+		throw new Error(
+			`Custom shell path not found: ${customShellPath}\nPlease update shellPath in ${getSettingsPath()}`,
+		);
 	}
 
 	if (process.platform === "win32") {
@@ -73,36 +101,36 @@ export function getShellConfig(customShellPath?: string): ShellConfig {
 
 		for (const path of paths) {
 			if (existsSync(path)) {
-				return { shell: path, args: ["-c"] };
+				return setCachedShellConfig(cacheKey, path, ["-c"]);
 			}
 		}
 
 		// 3. Fallback: search bash.exe on PATH (Cygwin, MSYS2, WSL, etc.)
 		const bashOnPath = findBashOnPath();
 		if (bashOnPath) {
-			return { shell: bashOnPath, args: ["-c"] };
+			return setCachedShellConfig(cacheKey, bashOnPath, ["-c"]);
 		}
 
 		throw new Error(
 			`No bash shell found. Options:\n` +
 				`  1. Install Git for Windows: https://git-scm.com/download/win\n` +
 				`  2. Add your bash to PATH (Cygwin, MSYS2, etc.)\n` +
-				"  3. Set shellPath in settings.json\n\n" +
+				`  3. Set shellPath in ${getSettingsPath()}\n\n` +
 				`Searched Git Bash in:\n${paths.map((p) => `  ${p}`).join("\n")}`,
 		);
 	}
 
 	// Unix: try /bin/bash, then bash on PATH, then fallback to sh
 	if (existsSync("/bin/bash")) {
-		return { shell: "/bin/bash", args: ["-c"] };
+		return setCachedShellConfig(cacheKey, "/bin/bash", ["-c"]);
 	}
 
 	const bashOnPath = findBashOnPath();
 	if (bashOnPath) {
-		return { shell: bashOnPath, args: ["-c"] };
+		return setCachedShellConfig(cacheKey, bashOnPath, ["-c"]);
 	}
 
-	return { shell: "sh", args: ["-c"] };
+	return setCachedShellConfig(cacheKey, "sh", ["-c"]);
 }
 
 export function getShellEnv(): NodeJS.ProcessEnv {
@@ -207,4 +235,13 @@ export function killProcessTree(pid: number): void {
 			}
 		}
 	}
+}
+
+/**
+ * Generate a unique temp file path for bash output capture.
+ * Used by both bash.ts (bash tool) and bash-executor.ts (executeBash).
+ */
+export function getTempFilePath(): string {
+	const id = randomBytes(8).toString("hex");
+	return join(tmpdir(), `pi-bash-${id}.log`);
 }

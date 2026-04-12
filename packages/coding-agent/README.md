@@ -616,3 +616,5 @@ MIT
 
 ## See Also
 
+- **Windows:** Bash/shell follow-up implementation and testing on Windows is intentionally deferred pending availability of a test environment.
+

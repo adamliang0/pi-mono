@@ -6,13 +6,10 @@
  * - Direct calls from modes that need bash execution
  */
 
-import { randomBytes } from "node:crypto";
 import { createWriteStream, type WriteStream } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import stripAnsi from "strip-ansi";
-import { sanitizeBinaryOutput } from "../utils/shell.js";
-import type { BashOperations } from "./tools/bash.js";
+import { getTempFilePath, sanitizeBinaryOutput } from "../utils/shell.js";
+import { type BashOperations, createLocalBashOperations } from "./tools/bash.js";
 import { DEFAULT_MAX_BYTES, truncateTail } from "./tools/truncate.js";
 
 // ============================================================================
@@ -44,6 +41,23 @@ export interface BashResult {
 // ============================================================================
 
 /**
+ * Execute a bash command with optional streaming and cancellation support.
+ *
+ * Uses the same local BashOperations backend as createBashTool() so interactive
+ * user bash and tool-invoked bash share the same process spawning behavior.
+ * Sanitization, newline normalization, temp-file capture, and truncation still
+ * happen in executeBashWithOperations(), so reusing the local backend does not
+ * change output processing behavior.
+ *
+ * @param command - The bash command to execute
+ * @param options - Optional streaming callback and abort signal
+ * @returns Promise resolving to execution result
+ */
+export function executeBash(command: string, options?: BashExecutorOptions): Promise<BashResult> {
+	return executeBashWithOperations(command, process.cwd(), createLocalBashOperations(), options);
+}
+
+/**
  * Execute a bash command using custom BashOperations.
  * Used for remote execution (SSH, containers, etc.).
  */
@@ -65,8 +79,7 @@ export async function executeBashWithOperations(
 		if (tempFilePath) {
 			return;
 		}
-		const id = randomBytes(8).toString("hex");
-		tempFilePath = join(tmpdir(), `pi-bash-${id}.log`);
+		tempFilePath = getTempFilePath();
 		tempFileStream = createWriteStream(tempFilePath);
 		for (const chunk of outputChunks) {
 			tempFileStream.write(chunk);
