@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { spawn, spawnSync } from "child_process";
 import { getBinDir, getSettingsPath } from "../config.js";
-import { SettingsManager } from "../core/settings-manager.js";
 
 let cachedShellConfig: { shell: string; args: string[] } | null = null;
 let cachedShellConfigKey: string | null = null;
@@ -65,13 +64,11 @@ function findBashOnPath(): string | null {
 /**
  * Get shell configuration based on platform.
  * Resolution order:
- * 1. User-specified shellPath in settings.json
+ * 1. User-specified shellPath from the caller
  * 2. On Windows: Git Bash in known locations, then bash on PATH
  * 3. On Unix: /bin/bash, then bash on PATH, then fallback to sh
  */
-export function getShellConfig(): { shell: string; args: string[] } {
-	const settings = SettingsManager.create();
-	const customShellPath = settings.getShellPath();
+export function getShellConfig(customShellPath?: string): { shell: string; args: string[] } {
 	const cacheKey = getShellConfigCacheKey(customShellPath);
 	if (cachedShellConfig && cachedShellConfigKey === cacheKey) {
 		return cachedShellConfig;

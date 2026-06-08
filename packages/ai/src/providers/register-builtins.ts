@@ -14,7 +14,6 @@ import type { BedrockOptions } from "./amazon-bedrock.js";
 import type { AnthropicOptions } from "./anthropic.js";
 import type { AzureOpenAIResponsesOptions } from "./azure-openai-responses.js";
 import type { GoogleOptions } from "./google.js";
-import type { GoogleGeminiCliOptions } from "./google-gemini-cli.js";
 import type { GoogleVertexOptions } from "./google-vertex.js";
 import type { MiniMaxOptions } from "./minimax.js";
 import type { MistralOptions } from "./mistral.js";
@@ -48,11 +47,6 @@ interface AzureOpenAIResponsesProviderModule {
 interface GoogleProviderModule {
 	streamGoogle: StreamFunction<"google-generative-ai", GoogleOptions>;
 	streamSimpleGoogle: StreamFunction<"google-generative-ai", SimpleStreamOptions>;
-}
-
-interface GoogleGeminiCliProviderModule {
-	streamGoogleGeminiCli: StreamFunction<"google-gemini-cli", GoogleGeminiCliOptions>;
-	streamSimpleGoogleGeminiCli: StreamFunction<"google-gemini-cli", SimpleStreamOptions>;
 }
 
 interface GoogleVertexProviderModule {
@@ -108,9 +102,6 @@ let azureOpenAIResponsesProviderModulePromise:
 	| undefined;
 let googleProviderModulePromise:
 	| Promise<LazyProviderModule<"google-generative-ai", GoogleOptions, SimpleStreamOptions>>
-	| undefined;
-let googleGeminiCliProviderModulePromise:
-	| Promise<LazyProviderModule<"google-gemini-cli", GoogleGeminiCliOptions, SimpleStreamOptions>>
 	| undefined;
 let googleVertexProviderModulePromise:
 	| Promise<LazyProviderModule<"google-vertex", GoogleVertexOptions, SimpleStreamOptions>>
@@ -257,19 +248,6 @@ function loadGoogleProviderModule(): Promise<
 	return googleProviderModulePromise;
 }
 
-function loadGoogleGeminiCliProviderModule(): Promise<
-	LazyProviderModule<"google-gemini-cli", GoogleGeminiCliOptions, SimpleStreamOptions>
-> {
-	googleGeminiCliProviderModulePromise ||= import("./google-gemini-cli.js").then((module) => {
-		const provider = module as GoogleGeminiCliProviderModule;
-		return {
-			stream: provider.streamGoogleGeminiCli,
-			streamSimple: provider.streamSimpleGoogleGeminiCli,
-		};
-	});
-	return googleGeminiCliProviderModulePromise;
-}
-
 function loadGoogleVertexProviderModule(): Promise<
 	LazyProviderModule<"google-vertex", GoogleVertexOptions, SimpleStreamOptions>
 > {
@@ -368,8 +346,6 @@ export const streamAzureOpenAIResponses = createLazyStream(loadAzureOpenAIRespon
 export const streamSimpleAzureOpenAIResponses = createLazySimpleStream(loadAzureOpenAIResponsesProviderModule);
 export const streamGoogle = createLazyStream(loadGoogleProviderModule);
 export const streamSimpleGoogle = createLazySimpleStream(loadGoogleProviderModule);
-export const streamGoogleGeminiCli = createLazyStream(loadGoogleGeminiCliProviderModule);
-export const streamSimpleGoogleGeminiCli = createLazySimpleStream(loadGoogleGeminiCliProviderModule);
 export const streamGoogleVertex = createLazyStream(loadGoogleVertexProviderModule);
 export const streamSimpleGoogleVertex = createLazySimpleStream(loadGoogleVertexProviderModule);
 export const streamMistral = createLazyStream(loadMistralProviderModule);
@@ -432,12 +408,6 @@ export function registerBuiltInApiProviders(): void {
 		api: "google-generative-ai",
 		stream: streamGoogle,
 		streamSimple: streamSimpleGoogle,
-	});
-
-	registerApiProvider({
-		api: "google-gemini-cli",
-		stream: streamGoogleGeminiCli,
-		streamSimple: streamSimpleGoogleGeminiCli,
 	});
 
 	registerApiProvider({

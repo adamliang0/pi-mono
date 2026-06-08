@@ -1,6 +1,6 @@
 {
 	"name": "@mariozechner/pi-ai",
-	"version": "0.67.0",
+	"version": "0.72.1",
 	"description": "Unified LLM API with automatic model discovery and provider configuration",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -21,10 +21,6 @@
 		"./google": {
 			"types": "./dist/providers/google.d.ts",
 			"import": "./dist/providers/google.js"
-		},
-		"./google-gemini-cli": {
-			"types": "./dist/providers/google-gemini-cli.d.ts",
-			"import": "./dist/providers/google-gemini-cli.js"
 		},
 		"./google-vertex": {
 			"types": "./dist/providers/google-vertex.d.ts",
@@ -69,28 +65,26 @@
 	"scripts": {
 		"clean": "shx rm -rf dist",
 		"generate-models": "npx tsx scripts/generate-models.ts",
-		"build": "npm run generate-models && tsc -b tsconfig.build.json",
+		"build": "npm run generate-models && tsgo -b tsconfig.build.json",
 		"dev": "tsgo -b tsconfig.build.json --watch --preserveWatchOutput",
 		"dev:tsc": "tsgo -b tsconfig.build.json --watch --preserveWatchOutput",
 		"test": "vitest --run",
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"dependencies": {
-		"@anthropic-ai/sdk": "^0.82.0",
-		"@aws-sdk/client-bedrock-runtime": "^3.1024.0",
-		"@google/genai": "^1.48.0",
-		"@mistralai/mistralai": "2.1.2",
-		"@sinclair/typebox": "^0.34.49",
-		"@smithy/node-http-handler": "^4.5.1",
+		"@anthropic-ai/sdk": "^0.91.1",
+		"@aws-sdk/client-bedrock-runtime": "^3.1030.0",
+		"@google/genai": "^1.40.0",
+		"@mistralai/mistralai": "^2.2.0",
+		"@smithy/node-http-handler": "^4.0.0",
 		"ai": "^6.0.146",
-		"ajv": "^8.18.0",
-		"ajv-formats": "^3.0.1",
+		"typebox": "^1.1.24",
 		"chalk": "^5.6.2",
-		"openai": "6.33.0",
+		"openai": "6.26.0",
 		"partial-json": "^0.1.7",
-		"proxy-agent": "^8.0.0",
-		"undici": "^8.0.2",
-		"zod-to-json-schema": "^3.25.2"
+		"proxy-agent": "^6.5.0",
+		"undici": "^7.19.1",
+		"zod-to-json-schema": "^3.24.6"
 	},
 	"keywords": [
 		"ai",
@@ -113,8 +107,8 @@
 		"node": ">=20.0.0"
 	},
 	"devDependencies": {
-		"@types/node": "^25.5.2",
-		"canvas": "^3.2.3",
-		"vitest": "^4.1.2"
+		"@types/node": "^24.3.0",
+		"canvas": "^3.2.0",
+		"vitest": "^3.2.4"
 	}
 }

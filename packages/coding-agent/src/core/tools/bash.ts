@@ -1,17 +1,18 @@
-import { createWriteStream, existsSync } from "node:fs";
+import { existsSync } from "node:fs";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { Container, Text, truncateToWidth } from "@mariozechner/pi-tui";
-import { type Static, Type } from "@sinclair/typebox";
 import { spawn } from "child_process";
+import { type Static, Type } from "typebox";
 import { keyHint } from "../../modes/interactive/components/keybinding-hints.js";
 import { truncateToVisualLines } from "../../modes/interactive/components/visual-truncate.js";
 import { theme } from "../../modes/interactive/theme/theme.js";
 import { waitForChildProcess } from "../../utils/child-process.js";
-import { getShellConfig, getShellEnv, getTempFilePath, killProcessTree } from "../../utils/shell.js";
+import { getShellConfig, getShellEnv, killProcessTree } from "../../utils/shell.js";
 import type { ToolDefinition, ToolRenderResultOptions } from "../extensions/types.js";
+import { OutputAccumulator } from "./output-accumulator.js";
 import { getTextOutput, invalidArgText, str } from "./render-utils.js";
 import { wrapToolDefinition } from "./tool-definition-wrapper.js";
-import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult, truncateTail } from "./truncate.js";
+import { DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, type TruncationResult } from "./truncate.js";
 
 const bashSchema = Type.Object({
 	command: Type.String({ description: "Bash command to execute" }),
@@ -70,7 +71,7 @@ export function createLocalBashOperations(options?: { shellPath?: string }): Bas
 				}
 				const child = spawn(shell, [...args, command], {
 					cwd,
-					detached: true,
+					detached: process.platform !== "win32",
 					env: env ?? getShellEnv(),
 					signal,
 					stdio: ["ignore", "pipe", "pipe"],
@@ -182,6 +183,7 @@ export interface BashToolOptions {
 }
 
 const BASH_PREVIEW_LINES = 5;
+const BASH_UPDATE_THROTTLE_MS = 100;
 
 type BashRenderState = {
 	startedAt: number | undefined;
@@ -313,125 +315,119 @@ export function createBashToolDefinition(
 		) {
 			const resolvedCommand = commandPrefix ? `${commandPrefix}\n${command}` : command;
 			const spawnContext = resolveSpawnContext(resolvedCommand, cwd, spawnHook);
+			const output = new OutputAccumulator({ tempFilePrefix: "pi-bash" });
+			let updateTimer: NodeJS.Timeout | undefined;
+			let updateDirty = false;
+			let lastUpdateAt = 0;
+
+			const emitOutputUpdate = () => {
+				if (!onUpdate || !updateDirty) return;
+				updateDirty = false;
+				lastUpdateAt = Date.now();
+				const snapshot = output.snapshot({ persistIfTruncated: true });
+				onUpdate({
+					content: [{ type: "text", text: snapshot.content || "" }],
+					details: {
+						truncation: snapshot.truncation.truncated ? snapshot.truncation : undefined,
+						fullOutputPath: snapshot.fullOutputPath,
+					},
+				});
+			};
+
+			const clearUpdateTimer = () => {
+				if (updateTimer) {
+					clearTimeout(updateTimer);
+					updateTimer = undefined;
+				}
+			};
+
+			const scheduleOutputUpdate = () => {
+				if (!onUpdate) return;
+				updateDirty = true;
+				const delay = BASH_UPDATE_THROTTLE_MS - (Date.now() - lastUpdateAt);
+				if (delay <= 0) {
+					clearUpdateTimer();
+					emitOutputUpdate();
+					return;
+				}
+				updateTimer ??= setTimeout(() => {
+					updateTimer = undefined;
+					emitOutputUpdate();
+				}, delay);
+			};
+
 			if (onUpdate) {
 				onUpdate({ content: [], details: undefined });
 			}
-			return new Promise((resolve, reject) => {
-				let tempFilePath: string | undefined;
-				let tempFileStream: ReturnType<typeof createWriteStream> | undefined;
-				let totalBytes = 0;
-				const chunks: Buffer[] = [];
-				let chunksBytes = 0;
-				const maxChunksBytes = DEFAULT_MAX_BYTES * 2;
 
-				const closeTempFile = () => {
-					if (!tempFileStream) return;
-					const stream = tempFileStream;
-					tempFileStream = undefined;
-					stream.end();
-				};
+			const handleData = (data: Buffer) => {
+				output.append(data);
+				scheduleOutputUpdate();
+			};
 
-				const ensureTempFile = () => {
-					if (tempFilePath) return;
-					tempFilePath = getTempFilePath();
-					tempFileStream = createWriteStream(tempFilePath);
-					for (const chunk of chunks) tempFileStream.write(chunk);
-				};
+			const finishOutput = async () => {
+				output.finish();
+				clearUpdateTimer();
+				emitOutputUpdate();
+				const snapshot = output.snapshot({ persistIfTruncated: true });
+				await output.closeTempFile();
+				return snapshot;
+			};
 
-				const handleData = (data: Buffer) => {
-					totalBytes += data.length;
-					// Start writing to a temp file once output exceeds the in-memory threshold.
-					if (totalBytes > DEFAULT_MAX_BYTES) {
-						ensureTempFile();
+			const formatOutput = (snapshot: Awaited<ReturnType<typeof finishOutput>>, emptyText = "(no output)") => {
+				const truncation = snapshot.truncation;
+				let text = snapshot.content || emptyText;
+				let details: BashToolDetails | undefined;
+				if (truncation.truncated) {
+					details = { truncation, fullOutputPath: snapshot.fullOutputPath };
+					const startLine = truncation.totalLines - truncation.outputLines + 1;
+					const endLine = truncation.totalLines;
+					if (truncation.lastLinePartial) {
+						const lastLineSize = formatSize(output.getLastLineBytes());
+						text += `\n\n[Showing last ${formatSize(truncation.outputBytes)} of line ${endLine} (line is ${lastLineSize}). Full output: ${snapshot.fullOutputPath}]`;
+					} else if (truncation.truncatedBy === "lines") {
+						text += `\n\n[Showing lines ${startLine}-${endLine} of ${truncation.totalLines}. Full output: ${snapshot.fullOutputPath}]`;
+					} else {
+						text += `\n\n[Showing lines ${startLine}-${endLine} of ${truncation.totalLines} (${formatSize(DEFAULT_MAX_BYTES)} limit). Full output: ${snapshot.fullOutputPath}]`;
 					}
-					// Write to temp file if we have one.
-					if (tempFileStream) tempFileStream.write(data);
-					// Keep a rolling buffer of recent output for tail truncation.
-					chunks.push(data);
-					chunksBytes += data.length;
-					// Trim old chunks if the rolling buffer grows too large.
-					while (chunksBytes > maxChunksBytes && chunks.length > 1) {
-						const removed = chunks.shift()!;
-						chunksBytes -= removed.length;
-					}
-					// Stream partial output using the rolling tail buffer.
-					if (onUpdate) {
-						const fullBuffer = Buffer.concat(chunks);
-						const fullText = fullBuffer.toString("utf-8");
-						const truncation = truncateTail(fullText);
-						if (truncation.truncated) {
-							ensureTempFile();
-						}
-						onUpdate({
-							content: [{ type: "text", text: truncation.content || "" }],
-							details: {
-								truncation: truncation.truncated ? truncation : undefined,
-								fullOutputPath: tempFilePath,
-							},
-						});
-					}
-				};
+				}
+				return { text, details };
+			};
 
-				ops.exec(spawnContext.command, spawnContext.cwd, {
-					onData: handleData,
-					signal,
-					timeout,
-					env: spawnContext.env,
-				})
-					.then(({ exitCode }) => {
-						// Combine the rolling buffer chunks.
-						const fullBuffer = Buffer.concat(chunks);
-						const fullOutput = fullBuffer.toString("utf-8");
-						// Apply tail truncation for the final display payload.
-						const truncation = truncateTail(fullOutput);
-						if (truncation.truncated) {
-							ensureTempFile();
-						}
-						// Close temp file stream before building the final result.
-						closeTempFile();
-						let outputText = truncation.content || "(no output)";
-						let details: BashToolDetails | undefined;
-						if (truncation.truncated) {
-							// Build truncation details and an actionable notice.
-							details = { truncation, fullOutputPath: tempFilePath };
-							const startLine = truncation.totalLines - truncation.outputLines + 1;
-							const endLine = truncation.totalLines;
-							if (truncation.lastLinePartial) {
-								// Edge case: the last line alone is larger than the byte limit.
-								const lastLineSize = formatSize(Buffer.byteLength(fullOutput.split("\n").pop() || "", "utf-8"));
-								outputText += `\n\n[Showing last ${formatSize(truncation.outputBytes)} of line ${endLine} (line is ${lastLineSize}). Full output: ${tempFilePath}]`;
-							} else if (truncation.truncatedBy === "lines") {
-								outputText += `\n\n[Showing lines ${startLine}-${endLine} of ${truncation.totalLines}. Full output: ${tempFilePath}]`;
-							} else {
-								outputText += `\n\n[Showing lines ${startLine}-${endLine} of ${truncation.totalLines} (${formatSize(DEFAULT_MAX_BYTES)} limit). Full output: ${tempFilePath}]`;
-							}
-						}
-						if (exitCode !== 0 && exitCode !== null) {
-							outputText += `\n\nCommand exited with code ${exitCode}`;
-							reject(new Error(outputText));
-						} else {
-							resolve({ content: [{ type: "text", text: outputText }], details });
-						}
-					})
-					.catch((err: Error) => {
-						// Close temp file stream and include buffered output in the error message.
-						closeTempFile();
-						const fullBuffer = Buffer.concat(chunks);
-						let output = fullBuffer.toString("utf-8");
-						if (err.message === "aborted") {
-							if (output) output += "\n\n";
-							output += "Command aborted";
-							reject(new Error(output));
-						} else if (err.message.startsWith("timeout:")) {
-							const timeoutSecs = err.message.split(":")[1];
-							if (output) output += "\n\n";
-							output += `Command timed out after ${timeoutSecs} seconds`;
-							reject(new Error(output));
-						} else {
-							reject(err);
-						}
+			const appendStatus = (text: string, status: string) => `${text ? `${text}\n\n` : ""}${status}`;
+
+			try {
+				let exitCode: number | null;
+				try {
+					const result = await ops.exec(spawnContext.command, spawnContext.cwd, {
+						onData: handleData,
+						signal,
+						timeout,
+						env: spawnContext.env,
 					});
-			});
+					exitCode = result.exitCode;
+				} catch (err) {
+					const snapshot = await finishOutput();
+					const { text } = formatOutput(snapshot, "");
+					if (err instanceof Error && err.message === "aborted") {
+						throw new Error(appendStatus(text, "Command aborted"));
+					}
+					if (err instanceof Error && err.message.startsWith("timeout:")) {
+						const timeoutSecs = err.message.split(":")[1];
+						throw new Error(appendStatus(text, `Command timed out after ${timeoutSecs} seconds`));
+					}
+					throw err;
+				}
+
+				const snapshot = await finishOutput();
+				const { text: outputText, details } = formatOutput(snapshot);
+				if (exitCode !== 0 && exitCode !== null) {
+					throw new Error(appendStatus(outputText, `Command exited with code ${exitCode}`));
+				}
+				return { content: [{ type: "text", text: outputText }], details };
+			} finally {
+				clearUpdateTimer();
+			}
 		},
 		renderCall(args, _theme, context) {
 			const state = context.state;
